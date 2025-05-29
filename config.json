@@ -1,0 +1,9 @@
+{
+    "csv_path": "Government_schemes_final_english.csv",
+    "conversation_log": "conversation_log.txt",
+    "default_language": "english",
+    "whisper_model_size": "base",
+    "tts_model_name_en": "tts_models/en/ljspeech/tacotron2-DDC",
+    "tts_model_name_hi": "tts_models/hi/fairseq/vits",
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+}

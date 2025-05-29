@@ -1,0 +1,13 @@
+# Ignore heavy folders
+assets/
+assets_converted/
+fresh_env/
+fresh_venv/
+models/
+speakers/
+
+# Ignore other unnecessary files
+__pycache__/
+*.pkl
+*.wav
+*.bin
