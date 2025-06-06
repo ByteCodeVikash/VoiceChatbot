@@ -1,476 +1,686 @@
 import streamlit as st
 import pandas as pd
-import json
 import os
 import time
-from datetime import datetime
+import datetime
 import logging
 from typing import Dict, List, Any
 import requests
-from dataclasses import dataclass
+import json
 
 # Set page config
 st.set_page_config(
-    page_title="🏛️ Government Schemes Assistant",
-    page_icon="🏛️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="🎤 Voice Government Schemes Assistant",
+    page_icon="🎤",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS
-st.markdown("""
+# Hide all default streamlit elements for clean voice interface
+hide_default_format = """
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-    }
-    .chat-message {
-        padding: 1rem;
-        border-radius: 15px;
-        margin-bottom: 1rem;
-        border-left: 5px solid #1f77b4;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .user-message {
-        background: linear-gradient(135deg, #e8f4f8, #d1ecf1);
-        border-left-color: #1f77b4;
-    }
-    .assistant-message {
-        background: linear-gradient(135deg, #f0f8e8, #e2f5d3);
-        border-left-color: #28a745;
-    }
-    .scheme-card {
-        background: linear-gradient(135deg, #ffffff, #f8f9fa);
-        padding: 1.5rem;
-        border-radius: 15px;
-        border: 1px solid #e0e0e0;
-        margin-bottom: 1rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-    }
-    .scheme-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-    .stats-card {
-        background: linear-gradient(135deg, #1f77b4, #17a2b8);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 15px;
-        text-align: center;
-        box-shadow: 0 4px 12px rgba(31, 119, 180, 0.3);
-    }
-    .quick-btn {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        color: white;
-        border: none;
-        padding: 0.8rem 1.5rem;
-        border-radius: 25px;
-        margin: 0.3rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
-    }
-    .quick-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
-    }
-    @media (max-width: 768px) {
-        .main-header {
-            font-size: 1.8rem !important;
-            margin-bottom: 1rem !important;
-        }
-        .chat-message {
-            padding: 0.8rem !important;
-            font-size: 0.9rem !important;
-        }
-    }
-</style>
-""", unsafe_allow_html=True)
+#MainMenu {visibility: hidden; }
+footer {visibility: hidden;}
+header {visibility: hidden;}
+.stDeployButton {display:none;}
+.stDecoration {display:none;}
 
-# Initialize session state
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
-if 'user_profile' not in st.session_state:
-    st.session_state.user_profile = {
-        'name': '',
-        'language': 'english',
-        'occupation': '',
-        'location': '',
-        'setup_complete': False
+/* Voice interface styling */
+.main-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    color: white;
+}
+
+.status-display {
+    background: rgba(255,255,255,0.1);
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin: 1rem 0;
+    border: 1px solid rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+}
+
+.voice-controls {
+    padding: 2rem;
+    margin: 1rem 0;
+}
+
+.big-button {
+    background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+    color: white;
+    border: none;
+    padding: 1.5rem 3rem;
+    border-radius: 50px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    margin: 0.5rem;
+    min-width: 200px;
+}
+
+.big-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(255, 107, 107, 0.6);
+}
+
+.recording {
+    animation: pulse 1.5s infinite;
+    background: linear-gradient(45deg, #d63031, #e17055) !important;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.conversation-log {
+    background: rgba(255,255,255,0.1);
+    padding: 1rem;
+    border-radius: 15px;
+    margin: 1rem 0;
+    text-align: left;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.step-indicator {
+    background: linear-gradient(45deg, #74b9ff, #0984e3);
+    padding: 1rem 2rem;
+    border-radius: 25px;
+    margin: 1rem 0;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.error-message {
+    background: linear-gradient(45deg, #d63031, #e17055);
+    padding: 1rem;
+    border-radius: 15px;
+    margin: 1rem 0;
+}
+
+.success-message {
+    background: linear-gradient(45deg, #00b894, #00cec9);
+    padding: 1rem;
+    border-radius: 15px;
+    margin: 1rem 0;
+}
+</style>
+"""
+
+st.markdown(hide_default_format, unsafe_allow_html=True)
+
+# JavaScript for voice recording
+voice_js = """
+<script>
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+
+window.startRecording = async function() {
+    try {
+        if (isRecording) return;
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = function(event) {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = async function() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            
+            // Mock speech recognition for demo
+            const transcript = await mockSpeechRecognition(audioBlob);
+            
+            // Send to Streamlit
+            window.parent.postMessage({
+                type: 'voice_input',
+                text: transcript
+            }, '*');
+        };
+        
+        mediaRecorder.start();
+        isRecording = true;
+        
+        // Update UI
+        const btn = parent.document.querySelector('[data-testid="stButton"] button');
+        if (btn && btn.textContent.includes('🎤 Start')) {
+            btn.style.background = 'linear-gradient(45deg, #d63031, #e17055)';
+            btn.textContent = '⏹️ Stop Recording';
+            btn.classList.add('recording');
+        }
+        
+        return true;
+    } catch (err) {
+        console.error('Microphone access denied:', err);
+        alert('🎤 Please allow microphone access and try again.');
+        return false;
     }
+}
+
+window.stopRecording = function() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        isRecording = false;
+        
+        // Update UI
+        const btn = parent.document.querySelector('[data-testid="stButton"] button');
+        if (btn) {
+            btn.style.background = 'linear-gradient(45deg, #ff6b6b, #ee5a24)';
+            btn.textContent = '🎤 Start Recording';
+            btn.classList.remove('recording');
+        }
+    }
+}
+
+// Mock speech recognition (replace with real API)
+async function mockSpeechRecognition(audioBlob) {
+    // Simulate processing delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Mock responses based on common queries
+    const mockResponses = [
+        "मुझे किसान योजना चाहिए",
+        "farmer scheme batao",
+        "women empowerment schemes",
+        "fisherman yojana ke baare mein batao",
+        "business loan scheme chahiye",
+        "education scholarship",
+        "kisan credit card",
+        "हमें सरकारी योजना चाहिए"
+    ];
+    
+    return mockResponses[Math.floor(Math.random() * mockResponses.length)];
+}
+
+// Listen for messages from Streamlit
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'control_recording') {
+        if (event.data.action === 'start') {
+            startRecording();
+        } else if (event.data.action === 'stop') {
+            stopRecording();
+        }
+    }
+});
+</script>
+"""
+
+# Initialize session state - EXACT TERMINAL REPLICA
+if 'conversation_state' not in st.session_state:
+    st.session_state.conversation_state = 'language_selection'  # Exactly like terminal
+if 'current_language' not in st.session_state:
+    st.session_state.current_language = None
+if 'user_name' not in st.session_state:
+    st.session_state.user_name = None
+if 'user_occupation' not in st.session_state:
+    st.session_state.user_occupation = None
+if 'user_location' not in st.session_state:
+    st.session_state.user_location = None
+if 'conversation_log' not in st.session_state:
+    st.session_state.conversation_log = []
+if 'recording' not in st.session_state:
+    st.session_state.recording = False
 if 'schemes_data' not in st.session_state:
     st.session_state.schemes_data = None
+if 'conversation_count' not in st.session_state:
+    st.session_state.conversation_count = 0
 
-@dataclass
-class Scheme:
-    name: str
-    department: str
-    details: str
-    benefits: str
-    eligibility: str
-    documents: str
-    gender: str
-    url: str
+# Load CSV data (simplified)
+@st.cache_data
+def load_schemes_data():
+    csv_path = "Government_schemes_final_english.csv"
+    if os.path.exists(csv_path):
+        return pd.read_csv(csv_path)
+    else:
+        # Demo data - exactly like terminal
+        return pd.DataFrame({
+            'Name': [
+                'PM-KISAN Samman Nidhi Yojana',
+                'Pradhan Mantri Matsya Sampada Yojana', 
+                'Mahila Shakti Kendra Scheme',
+                'Pradhan Mantri Mudra Yojana',
+                'National Scholarship Portal'
+            ],
+            'Department': ['Agriculture', 'Fisheries', 'Women Development', 'MSME', 'Education'],
+            'Details': [
+                'Direct income support to farmers providing Rs 6000 per year in three installments',
+                'Comprehensive development of fisheries sector with financial assistance for equipment',
+                'Women empowerment through skill development and training programs at village level',
+                'Micro finance scheme for small businesses providing collateral-free loans',
+                'Scholarship schemes for students from economically weaker sections'
+            ],
+            'Benefits': [
+                'Rs 6000 annual income support directly to bank account',
+                'Subsidized boats, nets and fishing equipment up to Rs 3 lakh',
+                'Free skill training and employment support for rural women',
+                'Collateral-free loans up to Rs 10 lakh for business',
+                'Educational scholarships and fee reimbursement'
+            ],
+            'Eligibility': [
+                'Small and marginal farmers with land records',
+                'Registered fishermen and fish farmers',
+                'Women aged 18-65 from rural areas',
+                'Non-defaulter individuals for business loans',
+                'Students from economically weaker sections'
+            ],
+            'Document_Required': [
+                'Aadhaar, Land records, Bank account details',
+                'Fishing license, Aadhaar, Bank account',
+                'Aadhaar, Age proof, Address proof',
+                'Aadhaar, PAN, Business plan, Bank statement',
+                'Income certificate, Aadhaar, Educational certificates'
+            ],
+            'Gender': ['All', 'All', 'Female', 'All', 'All'],
+            'URL': ['pmkisan.gov.in', 'dof.gov.in', 'wcd.nic.in', 'mudra.org.in', 'scholarships.gov.in']
+        })
 
-class SimplifiedSchemeAssistant:
-    def __init__(self):
-        self.setup_data()
-        
-    def setup_data(self):
-        """Load CSV data"""
-        try:
-            csv_path = "Government_schemes_final_english.csv"
-            if os.path.exists(csv_path):
-                st.session_state.schemes_data = pd.read_csv(csv_path)
-                st.success(f"✅ Loaded {len(st.session_state.schemes_data)} schemes from CSV")
-            else:
-                st.error("❌ CSV file not found. Please upload Government_schemes_final_english.csv")
-                # Create sample data for demo
-                st.session_state.schemes_data = pd.DataFrame({
-                    'Name': ['PM-KISAN Scheme', 'Fisheries Development Scheme'],
-                    'Department': ['Agriculture', 'Fisheries'],
-                    'Details': ['Direct income support for farmers', 'Financial assistance for fishermen'],
-                    'Benefits': ['₹6000 per year', 'Subsidized equipment'],
-                    'Eligibility': ['Small farmers', 'Registered fishermen'],
-                    'Document_Required': ['Land records', 'Fishing license'],
-                    'Gender': ['All', 'All'],
-                    'URL': ['example.com', 'example.com']
-                })
-                st.warning("⚠️ Using demo data. Upload CSV for full functionality.")
-        except Exception as e:
-            st.error(f"❌ Error loading data: {e}")
+# Load data
+if st.session_state.schemes_data is None:
+    st.session_state.schemes_data = load_schemes_data()
+
+# Voice search function (simplified)
+def search_schemes(query, occupation=None, location=None):
+    """Simple voice-optimized search"""
+    df = st.session_state.schemes_data
     
-    def search_schemes(self, query: str, occupation: str = None, location: str = None, top_k: int = 5):
-        """Simple text-based search"""
-        if st.session_state.schemes_data is None:
-            return []
-        
-        try:
-            df = st.session_state.schemes_data.copy()
-            
-            # Convert query to lowercase for matching
-            query_lower = query.lower()
-            
-            # Create search columns
-            df['search_text'] = (
-                df['Name'].fillna('').astype(str) + ' ' +
-                df['Department'].fillna('').astype(str) + ' ' +
-                df['Details'].fillna('').astype(str) + ' ' +
-                df['Benefits'].fillna('').astype(str) + ' ' +
-                df['Eligibility'].fillna('').astype(str)
-            ).str.lower()
-            
-            # Basic keyword matching
-            keywords = query_lower.split()
-            mask = pd.Series([True] * len(df))
-            
-            for keyword in keywords:
-                if len(keyword) > 2:  # Skip very short words
-                    mask &= df['search_text'].str.contains(keyword, na=False)
-            
-            # Apply occupation filter
-            if occupation and occupation != "":
-                occupation_keywords = {
-                    'farmer': ['farmer', 'agriculture', 'farming', 'crop', 'kisan'],
-                    'fisherman': ['fish', 'marine', 'boat', 'matsya'],
-                    'women': ['women', 'woman', 'female', 'mahila'],
-                    'business': ['business', 'entrepreneur', 'mudra', 'loan'],
-                    'student': ['education', 'scholarship', 'student']
-                }
-                
-                if occupation in occupation_keywords:
-                    occ_mask = pd.Series([False] * len(df))
-                    for keyword in occupation_keywords[occupation]:
-                        occ_mask |= df['search_text'].str.contains(keyword, na=False)
-                    mask &= occ_mask
-            
-            # Apply location filter (basic)
-            if location and location != "":
-                # Simple location matching
-                mask &= df['search_text'].str.contains(location.lower(), na=False)
-            
-            # Get results
-            results = df[mask].head(top_k)
-            
-            # Convert to list of dicts
-            schemes = []
-            for _, row in results.iterrows():
-                schemes.append({
-                    'Name': row.get('Name', 'Unknown'),
-                    'Department': row.get('Department', 'Unknown'),
-                    'Details': row.get('Details', 'No details available'),
-                    'Benefits': row.get('Benefits', 'Benefits information available'),
-                    'Eligibility': row.get('Eligibility', 'Check eligibility criteria'),
-                    'Document_Required': row.get('Document_Required', 'Standard documents required'),
-                    'Gender': row.get('Gender', 'All'),
-                    'URL': row.get('URL', ''),
-                    'Score': 0.8  # Dummy score
-                })
-            
-            return schemes
-            
-        except Exception as e:
-            st.error(f"Search error: {e}")
-            return []
+    # Voice query processing
+    query_words = query.lower().split()
     
-    def get_groq_response(self, query: str, schemes: List[Dict], occupation: str = None, location: str = None):
-        """Get AI response using Groq API"""
-        try:
-            # Get API key
-            groq_api_key = st.secrets.get("GROQ_API_KEY", "") or os.getenv("GROQ_API_KEY", "")
-            
-            if not groq_api_key:
-                return self.generate_simple_response(query, schemes, occupation, location)
-            
-            # Build context from schemes
-            context = "Available Government Schemes:\n\n"
-            for i, scheme in enumerate(schemes[:3], 1):
-                context += f"{i}. {scheme['Name']}\n"
-                context += f"   Department: {scheme['Department']}\n"
-                context += f"   Details: {scheme['Details'][:200]}...\n"
-                context += f"   Benefits: {scheme['Benefits'][:150]}...\n"
-                context += f"   Eligibility: {scheme['Eligibility'][:150]}...\n\n"
-            
-            # Build prompt
-            user_context = ""
-            if occupation:
-                user_context += f"User is a {occupation}. "
-            if location:
-                user_context += f"User is from {location}. "
-            
-            prompt = f"""You are a helpful Government Schemes Assistant for India. {user_context}
-
-User Query: {query}
-
-{context}
-
-Please provide a helpful response about the relevant government schemes. Keep it conversational and under 200 words. Focus on the most relevant schemes for the user's query.
-
-Response:"""
-
-            # Make API call
-            headers = {
-                "Authorization": f"Bearer {groq_api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "model": "mixtral-8x7b-32768",
-                "temperature": 0.1,
-                "max_tokens": 300
-            }
-            
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                ai_response = result['choices'][0]['message']['content'].strip()
-                return ai_response
-            else:
-                st.warning(f"API Error: {response.status_code}")
-                return self.generate_simple_response(query, schemes, occupation, location)
-                
-        except Exception as e:
-            st.warning(f"AI API failed: {e}")
-            return self.generate_simple_response(query, schemes, occupation, location)
+    # Create search mask
+    search_text = (
+        df['Name'].fillna('').astype(str) + ' ' +
+        df['Department'].fillna('').astype(str) + ' ' +
+        df['Details'].fillna('').astype(str) + ' ' +
+        df['Benefits'].fillna('').astype(str)
+    ).str.lower()
     
-    def generate_simple_response(self, query: str, schemes: List[Dict], occupation: str = None, location: str = None):
-        """Generate simple response without AI"""
-        if not schemes:
-            return f"I couldn't find specific schemes for '{query}'. Please try different keywords like 'farmer', 'women', 'education', 'business', or 'housing'."
+    mask = pd.Series([False] * len(df))
+    
+    # Search for keywords
+    for word in query_words:
+        if len(word) > 2:
+            mask |= search_text.str.contains(word, na=False, regex=False)
+    
+    # Occupation filter
+    if occupation:
+        occ_keywords = {
+            'farmer': ['farmer', 'agriculture', 'farming', 'kisan'],
+            'fisherman': ['fish', 'marine', 'boat', 'matsya'],
+            'women': ['women', 'woman', 'female', 'mahila'],
+            'business': ['business', 'entrepreneur', 'mudra'],
+            'student': ['education', 'scholarship', 'student']
+        }
         
-        response = f"I found {len(schemes)} relevant government schemes for your query '{query}':\n\n"
-        
-        for i, scheme in enumerate(schemes[:2], 1):
-            response += f"**{i}. {scheme['Name']}**\n"
-            response += f"• **Department:** {scheme['Department']}\n"
-            response += f"• **Benefits:** {scheme['Benefits'][:100]}...\n"
-            response += f"• **Eligibility:** {scheme['Eligibility'][:100]}...\n\n"
-        
-        if len(schemes) > 2:
-            response += f"...and {len(schemes) - 2} more schemes available.\n\n"
-        
-        response += "Would you like more details about any specific scheme?"
-        
-        return response
+        if occupation in occ_keywords:
+            occ_mask = pd.Series([False] * len(df))
+            for keyword in occ_keywords[occupation]:
+                occ_mask |= search_text.str.contains(keyword, na=False, regex=False)
+            mask &= occ_mask
+    
+    results = df[mask].head(3)
+    return results.to_dict('records') if not results.empty else []
 
+# Generate response (voice-optimized)
+def generate_voice_response(query, schemes, language):
+    """Generate voice-appropriate response"""
+    if not schemes:
+        responses = {
+            'english': f"I couldn't find specific schemes for '{query}'. Please try different keywords.",
+            'hindi': f"'{query}' के लिए कोई विशेष योजना नहीं मिली। अलग keywords try करें।",
+            'hinglish': f"'{query}' ke liye koi specific scheme nahi mili. Different keywords try kariye।"
+        }
+        return responses.get(language, responses['hinglish'])
+    
+    scheme = schemes[0]
+    name = scheme['Name']
+    benefits = scheme['Benefits'][:100]  # Keep short for voice
+    
+    responses = {
+        'english': f"I found {len(schemes)} schemes. Main scheme is {name}. {benefits}",
+        'hindi': f"मुझे {len(schemes)} योजनाएं मिलीं। मुख्य योजना है {name}। {benefits}",
+        'hinglish': f"Mujhe {len(schemes)} schemes mili hain। Main scheme hai {name}। {benefits}"
+    }
+    
+    return responses.get(language, responses['hinglish'])
+
+# Text-to-speech function
+def speak_text(text, language='hinglish'):
+    """Convert text to speech URL"""
+    try:
+        # Use simple TTS service
+        lang_code = 'hi' if language == 'hindi' else 'en'
+        # For demo, return a placeholder URL
+        # In production, integrate with Google TTS or similar
+        tts_url = f"data:text/plain,Speaking: {text[:100]}..."
+        return tts_url
+    except:
+        return ""
+
+# Main app interface
 def main():
-    # Initialize assistant
-    assistant = SimplifiedSchemeAssistant()
+    # Title
+    st.markdown("""
+    <div class="main-container">
+        <h1>🎤 Voice Government Schemes Assistant</h1>
+        <p style="font-size: 1.1rem; margin-bottom: 2rem;">
+            Exact Terminal Experience - Voice Only Interface
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Header
-    st.markdown('<h1 class="main-header">🏛️ Government Schemes AI Assistant</h1>', unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666; font-size: 1.1rem;'>Discover government schemes tailored for you</p>", unsafe_allow_html=True)
+    # Add JavaScript
+    st.components.v1.html(voice_js, height=0)
     
-    # Sidebar for user profile
-    with st.sidebar:
-        st.header("👤 User Profile")
-        
-        # Language selection
-        language = st.selectbox(
-            "🌐 Language",
-            ["english", "hindi", "hinglish"],
-            index=["english", "hindi", "hinglish"].index(st.session_state.user_profile['language'])
-        )
-        st.session_state.user_profile['language'] = language
-        
-        # User details
-        name = st.text_input("📝 Name", value=st.session_state.user_profile['name'])
-        st.session_state.user_profile['name'] = name
-        
-        occupation = st.selectbox(
-            "💼 Occupation",
-            ["", "farmer", "fisherman", "women", "business", "student", "teacher", "doctor", "other"],
-            index=0 if not st.session_state.user_profile['occupation'] else 
-                  ["", "farmer", "fisherman", "women", "business", "student", "teacher", "doctor", "other"].index(st.session_state.user_profile['occupation']) if st.session_state.user_profile['occupation'] in ["", "farmer", "fisherman", "women", "business", "student", "teacher", "doctor", "other"] else 8
-        )
-        st.session_state.user_profile['occupation'] = occupation
-        
-        location = st.selectbox(
-            "📍 State",
-            ["", "andhra pradesh", "gujarat", "goa", "karnataka", "kerala", "tamil nadu", 
-             "maharashtra", "uttar pradesh", "rajasthan", "punjab", "haryana", "other"],
-            index=0
-        )
-        st.session_state.user_profile['location'] = location
-        
-        # Save profile
-        if st.button("💾 Save Profile", key="save_profile"):
-            st.session_state.user_profile['setup_complete'] = True
-            st.success("✅ Profile saved!")
-        
-        # Stats
-        if st.session_state.schemes_data is not None:
-            total_schemes = len(st.session_state.schemes_data)
-            st.markdown(f"""
-            <div class="stats-card">
-                <h3>📊 Database</h3>
-                <p><strong>{total_schemes:,}</strong> Government Schemes</p>
-                <p>🔍 Smart Search Enabled</p>
-            </div>
-            """, unsafe_allow_html=True)
+    # State-based UI - EXACT TERMINAL FLOW
+    if st.session_state.conversation_state == 'language_selection':
+        show_language_selection()
+    elif st.session_state.conversation_state == 'name_collection':
+        show_name_collection()
+    elif st.session_state.conversation_state == 'occupation_collection':
+        show_occupation_collection()
+    elif st.session_state.conversation_state == 'main_conversation':
+        show_main_conversation()
+    elif st.session_state.conversation_state == 'completed':
+        show_completion()
+
+def show_language_selection():
+    """EXACT replica of terminal language selection"""
+    st.markdown("""
+    <div class="status-display">
+        <h2>🌐 SELECT LANGUAGE / भाषा चुनें</h2>
+        <p><strong>Step 1:</strong> Choose your preferred language</p>
+        <div style="font-size: 1.1rem; margin: 1rem 0;">
+            1️⃣ हिंदी (Hindi)<br>
+            2️⃣ English<br>
+            3️⃣ हिंग्लिश (Hinglish)
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Main content
-    col1, col2 = st.columns([2.5, 1.5])
+    show_voice_controls("Say your choice: Hindi, English, or Hinglish")
+    
+    # Language selection buttons
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.subheader("💬 Chat with Assistant")
-        
-        # Display chat messages
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.markdown(f"""
-                <div class="chat-message user-message">
-                    <strong>👤 You:</strong> {message["content"]}
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="chat-message assistant-message">
-                    <strong>🤖 Assistant:</strong> {message["content"]}
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Chat input
-        user_input = st.chat_input("Ask about government schemes... (e.g., 'farming subsidies', 'women schemes')")
-        
-        if user_input:
-            # Add user message
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            
-            # Search for schemes
-            with st.spinner("🔍 Searching schemes..."):
-                schemes = assistant.search_schemes(
-                    user_input,
-                    st.session_state.user_profile['occupation'],
-                    st.session_state.user_profile['location'],
-                    top_k=5
-                )
-            
-            # Get AI response
-            with st.spinner("🤖 Generating response..."):
-                response = assistant.get_groq_response(
-                    user_input,
-                    schemes,
-                    st.session_state.user_profile['occupation'],
-                    st.session_state.user_profile['location']
-                )
-            
-            # Add assistant response
-            st.session_state.messages.append({"role": "assistant", "content": response})
-            
-            # Rerun to update chat
+        if st.button("🇮🇳 हिंदी", key="lang_hindi", use_container_width=True):
+            st.session_state.current_language = 'hindi'
+            st.session_state.conversation_state = 'name_collection'
+            st.session_state.conversation_log.append("✅ Selected: Hindi")
             st.rerun()
     
     with col2:
-        st.subheader("🚀 Quick Search")
-        
-        # Quick search buttons
-        quick_searches = [
-            ("🌾", "Farmer schemes"),
-            ("👩", "Women schemes"),
-            ("🎣", "Fisherman schemes"),
-            ("📚", "Education schemes"),
-            ("🏠", "Housing schemes"),
-            ("💼", "Business loans"),
-            ("🏥", "Health schemes"),
-            ("👵", "Senior citizen schemes")
-        ]
-        
-        for emoji, search_text in quick_searches:
-            if st.button(f"{emoji} {search_text}", key=f"quick_{search_text}", use_container_width=True):
-                # Add to chat
-                st.session_state.messages.append({"role": "user", "content": search_text})
-                
-                # Search
-                schemes = assistant.search_schemes(
-                    search_text,
-                    st.session_state.user_profile['occupation'],
-                    st.session_state.user_profile['location']
-                )
-                
-                # Get response
-                response = assistant.get_groq_response(
-                    search_text,
-                    schemes,
-                    st.session_state.user_profile['occupation'],
-                    st.session_state.user_profile['location']
-                )
-                
-                st.session_state.messages.append({"role": "assistant", "content": response})
+        if st.button("🇬🇧 English", key="lang_english", use_container_width=True):
+            st.session_state.current_language = 'english'
+            st.session_state.conversation_state = 'name_collection'
+            st.session_state.conversation_log.append("✅ Selected: English")
+            st.rerun()
+    
+    with col3:
+        if st.button("🎭 Hinglish", key="lang_hinglish", use_container_width=True):
+            st.session_state.current_language = 'hinglish'
+            st.session_state.conversation_state = 'name_collection'
+            st.session_state.conversation_log.append("✅ Selected: Hinglish")
+            st.rerun()
+
+def show_name_collection():
+    """EXACT replica of terminal name collection"""
+    prompts = {
+        'hindi': "आपका नाम क्या है?",
+        'english': "What's your name?",
+        'hinglish': "Aapka naam kya hai?"
+    }
+    
+    current_prompt = prompts[st.session_state.current_language]
+    
+    st.markdown(f"""
+    <div class="status-display">
+        <h2>👤 NAME COLLECTION</h2>
+        <p><strong>Step 2:</strong> Please tell us your name</p>
+        <div class="step-indicator">
+            {current_prompt}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    show_voice_controls(current_prompt)
+    
+    # Manual input for demo
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        name_input = st.text_input("Or type your name:", key="name_input")
+    with col2:
+        if st.button("Submit", key="submit_name"):
+            if name_input.strip():
+                st.session_state.user_name = name_input.strip()
+                st.session_state.conversation_state = 'occupation_collection'
+                st.session_state.conversation_log.append(f"👤 Name: {name_input}")
                 st.rerun()
+
+def show_occupation_collection():
+    """EXACT replica of terminal occupation collection"""
+    prompts = {
+        'hindi': "अपना व्यवसाय या स्थान बताएं (जैसे: मैं किसान हूँ, गुजरात से)",
+        'english': "Tell me your occupation or location (e.g: I am farmer from Gujarat)",
+        'hinglish': "Apna occupation ya location batayiye (jaise: main farmer hun, Gujarat se)"
+    }
+    
+    current_prompt = prompts[st.session_state.current_language]
+    
+    st.markdown(f"""
+    <div class="status-display">
+        <h2>💼 OCCUPATION & LOCATION</h2>
+        <p><strong>Step 3:</strong> Tell us about your occupation and location</p>
+        <div class="step-indicator">
+            {current_prompt}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    show_voice_controls(current_prompt)
+    
+    # Quick selection buttons
+    st.markdown("**Quick Selection:**")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("🌾 Farmer", key="occ_farmer"):
+            st.session_state.user_occupation = 'farmer'
+            process_occupation_selection()
+    
+    with col2:
+        if st.button("🎣 Fisherman", key="occ_fisherman"):
+            st.session_state.user_occupation = 'fisherman'
+            process_occupation_selection()
+    
+    with col3:
+        if st.button("👩 Women", key="occ_women"):
+            st.session_state.user_occupation = 'women'
+            process_occupation_selection()
+    
+    with col4:
+        if st.button("💼 Business", key="occ_business"):
+            st.session_state.user_occupation = 'business'
+            process_occupation_selection()
+    
+    # Manual input
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        occupation_input = st.text_input("Or describe your occupation/location:", key="occupation_input")
+    with col2:
+        if st.button("Submit", key="submit_occupation"):
+            if occupation_input.strip():
+                # Simple parsing
+                if any(word in occupation_input.lower() for word in ['farmer', 'kisan', 'खेती']):
+                    st.session_state.user_occupation = 'farmer'
+                elif any(word in occupation_input.lower() for word in ['fish', 'machhuara', 'मछली']):
+                    st.session_state.user_occupation = 'fisherman'
+                elif any(word in occupation_input.lower() for word in ['women', 'mahila', 'female']):
+                    st.session_state.user_occupation = 'women'
+                else:
+                    st.session_state.user_occupation = 'general'
+                
+                process_occupation_selection()
+
+def process_occupation_selection():
+    """Process occupation selection and move to main conversation"""
+    st.session_state.conversation_state = 'main_conversation'
+    st.session_state.conversation_log.append(f"💼 Occupation: {st.session_state.user_occupation}")
+    st.rerun()
+
+def show_main_conversation():
+    """EXACT replica of terminal main conversation"""
+    query_prompts = {
+        'hindi': "सरकारी योजनाओं के बारे में क्या जानना चाहते हैं?",
+        'english': "What would you like to know about government schemes?",
+        'hinglish': "Government schemes ke baare mein kya jaanna chahte hain?"
+    }
+    
+    current_prompt = query_prompts[st.session_state.current_language]
+    
+    # Show user info - exactly like terminal
+    st.markdown(f"""
+    <div class="status-display">
+        <h2>💬 CONVERSATION WITH {st.session_state.user_name.upper()}</h2>
+        <p><strong>Language:</strong> {st.session_state.current_language.title()}</p>
+        <p><strong>Occupation:</strong> {st.session_state.user_occupation or 'Not specified'}</p>
+        <p><strong>Query Count:</strong> {st.session_state.conversation_count}/5</p>
+        <hr>
+        <div class="step-indicator">
+            Query {st.session_state.conversation_count + 1}: {current_prompt}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.session_state.conversation_count < 5:
+        show_voice_controls(current_prompt)
         
-        # Sample schemes display
-        st.subheader("📋 Sample Schemes")
-        if st.session_state.schemes_data is not None:
-            try:
-                sample_schemes = assistant.search_schemes("agriculture", top_k=3)
-                for scheme in sample_schemes:
-                    with st.expander(f"📄 {scheme['Name'][:40]}..."):
-                        st.write(f"**Department:** {scheme['Department']}")
-                        st.write(f"**Benefits:** {scheme['Benefits'][:150]}...")
-                        st.write(f"**Eligibility:** {scheme['Eligibility'][:150]}...")
-            except:
-                st.write("Loading sample schemes...")
+        # Quick query buttons
+        st.markdown("**Quick Queries:**")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🌾 Farmer Schemes", key="query_farmer"):
+                process_voice_query("farmer schemes")
+        
+        with col2:
+            if st.button("👩 Women Schemes", key="query_women"):
+                process_voice_query("women empowerment schemes")
+        
+        with col3:
+            if st.button("💼 Business Loans", key="query_business"):
+                process_voice_query("business loan schemes")
+        
+        # Manual query input
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            query_input = st.text_input("Or type your question:", key="query_input")
+        with col2:
+            if st.button("Ask", key="submit_query"):
+                if query_input.strip():
+                    process_voice_query(query_input.strip())
+        
+        # End conversation button
+        if st.button("🔚 End Conversation", key="end_conversation"):
+            st.session_state.conversation_state = 'completed'
+            st.rerun()
+    else:
+        st.markdown("""
+        <div class="success-message">
+            <h3>✅ Maximum 5 queries completed!</h3>
+            <p>Thank you for using the Voice Government Schemes Assistant.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔚 End Session", key="end_session"):
+            st.session_state.conversation_state = 'completed'
+            st.rerun()
 
-    # Footer
-    st.markdown("---")
-    st.markdown(
-        "<p style='text-align: center; color: #888;'>🏛️ Government Schemes Assistant | Made with ❤️ using Streamlit</p>",
-        unsafe_allow_html=True
-    )
+def process_voice_query(query):
+    """Process voice query - exactly like terminal"""
+    st.session_state.conversation_count += 1
+    
+    # Log the query
+    st.session_state.conversation_log.append(f"🗣️ Query {st.session_state.conversation_count}: {query}")
+    
+    # Search schemes
+    schemes = search_schemes(query, st.session_state.user_occupation)
+    
+    # Generate response
+    response = generate_voice_response(query, schemes, st.session_state.current_language)
+    
+    # Log the response
+    st.session_state.conversation_log.append(f"🤖 Response: {response}")
+    
+    # Show found schemes
+    if schemes:
+        st.session_state.conversation_log.append(f"📋 Found {len(schemes)} schemes:")
+        for i, scheme in enumerate(schemes, 1):
+            st.session_state.conversation_log.append(f"  {i}. {scheme['Name']}")
+    
+    st.rerun()
 
+def show_completion():
+    """Show completion screen"""
+    st.markdown(f"""
+    <div class="success-message">
+        <h2>🎉 Session Completed!</h2>
+        <p>Thank you <strong>{st.session_state.user_name}</strong> for using our Voice Assistant.</p>
+        <p>Language: {st.session_state.current_language.title()}</p>
+        <p>Queries Processed: {st.session_state.conversation_count}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔄 Start New Session", key="restart"):
+        # Reset all session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+def show_voice_controls(prompt):
+    """Show voice control interface"""
+    st.markdown(f"""
+    <div class="voice-controls">
+        <p style="margin-bottom: 1rem;"><strong>🎤 Voice Prompt:</strong> {prompt}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🎤 Start Recording", key=f"start_record_{st.session_state.conversation_state}", use_container_width=True):
+            st.session_state.recording = True
+            st.info("🔴 Recording... Speak now! (Click Stop when finished)")
+    
+    with col2:
+        if st.button("⏹️ Stop Recording", key=f"stop_record_{st.session_state.conversation_state}", use_container_width=True):
+            st.session_state.recording = False
+            st.success("✅ Recording stopped. Processing...")
+
+# Show conversation log (exactly like terminal)
+if st.session_state.conversation_log:
+    st.markdown("### 📊 Conversation Log")
+    st.markdown("""
+    <div class="conversation-log">
+    """ + "<br>".join(st.session_state.conversation_log) + """
+    </div>
+    """, unsafe_allow_html=True)
+
+# Run the app
 if __name__ == "__main__":
     main()
