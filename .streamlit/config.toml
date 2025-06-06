@@ -1,0 +1,25 @@
+[global]
+# Show warning for file watcher
+showWarningOnDirectExecution = false
+
+[server]
+# Port configuration
+port = 8501
+enableCORS = false
+enableXsrfProtection = false
+
+# Memory settings
+maxUploadSize = 200
+maxMessageSize = 200
+
+[browser]
+# Automatically open browser
+gatherUsageStats = false
+
+[theme]
+# App theme
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"
