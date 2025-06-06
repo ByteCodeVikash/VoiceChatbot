@@ -1,597 +1,480 @@
-import streamlit as st
+# app.py - Perfect Voice Assistant with Gradio
+import gradio as gr
 import pandas as pd
 import os
 import time
-import datetime
 import json
-import base64
-from typing import Dict, List
+from typing import List, Dict, Tuple, Optional
+import requests
+from gtts import gTTS
+import tempfile
+import io
+import speech_recognition as sr
+from pydub import AudioSegment
+import numpy as np
 
-# Set page config for voice interface
-st.set_page_config(
-    page_title="🎤 Voice Government Assistant",
-    page_icon="🎤",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# Custom CSS for Gemini-like interface
-st.markdown("""
-<style>
-/* Hide default Streamlit elements */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-.stDeployButton {display: none;}
-
-/* Gemini-style interface */
-.chat-container {
-    max-width: 700px;
-    margin: 0 auto;
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-    border-radius: 25px;
-    padding: 2rem;
-    color: white;
-    min-height: 80vh;
-}
-
-.voice-status {
-    background: rgba(255,255,255,0.1);
-    border-radius: 20px;
-    padding: 1.5rem;
-    margin: 1rem 0;
-    text-align: center;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.2);
-}
-
-.bot-speaking {
-    background: linear-gradient(45deg, #667eea, #764ba2);
-    padding: 1.5rem;
-    border-radius: 20px;
-    margin: 1rem 0;
-    animation: speaking 2s infinite;
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
-}
-
-@keyframes speaking {
-    0%, 100% { transform: scale(1); opacity: 0.9; }
-    50% { transform: scale(1.02); opacity: 1; }
-}
-
-.user-listening {
-    background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-    padding: 1.5rem;
-    border-radius: 20px;
-    margin: 1rem 0;
-    animation: listening 1.5s infinite;
-    box-shadow: 0 8px 32px rgba(255, 107, 107, 0.3);
-}
-
-@keyframes listening {
-    0%, 100% { box-shadow: 0 8px 32px rgba(255, 107, 107, 0.3); }
-    50% { box-shadow: 0 12px 40px rgba(255, 107, 107, 0.6); }
-}
-
-.voice-controls {
-    text-align: center;
-    margin: 2rem 0;
-}
-
-.big-voice-btn {
-    background: linear-gradient(45deg, #00b894, #00cec9);
-    color: white;
-    border: none;
-    padding: 1.5rem 3rem;
-    border-radius: 50px;
-    font-size: 1.3rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4);
-    margin: 0.5rem;
-    min-width: 250px;
-}
-
-.big-voice-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 35px rgba(0, 184, 148, 0.6);
-}
-
-.conversation-step {
-    background: rgba(255,255,255,0.1);
-    padding: 1rem 1.5rem;
-    border-radius: 15px;
-    margin: 0.5rem 0;
-    border-left: 4px solid #74b9ff;
-    font-family: 'Arial', sans-serif;
-}
-
-.step-completed {
-    border-left-color: #00b894;
-    background: rgba(0, 184, 148, 0.1);
-}
-
-.assistant-avatar {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(45deg, #667eea, #764ba2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    margin: 0 auto 1rem auto;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.status-indicator {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 8px;
-}
-
-.status-ready { background: #00b894; }
-.status-speaking { background: #667eea; animation: pulse 1s infinite; }
-.status-listening { background: #ff6b6b; animation: pulse 1s infinite; }
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.audio-visualizer {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 3px;
-    margin: 1rem 0;
-}
-
-.audio-bar {
-    width: 4px;
-    height: 20px;
-    background: #74b9ff;
-    border-radius: 2px;
-    animation: audioWave 1.5s infinite ease-in-out;
-}
-
-.audio-bar:nth-child(2) { animation-delay: 0.1s; }
-.audio-bar:nth-child(3) { animation-delay: 0.2s; }
-.audio-bar:nth-child(4) { animation-delay: 0.3s; }
-.audio-bar:nth-child(5) { animation-delay: 0.4s; }
-
-@keyframes audioWave {
-    0%, 100% { height: 20px; }
-    50% { height: 40px; }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Advanced Voice JavaScript
-voice_js = """
-<script>
-let mediaRecorder;
-let audioChunks = [];
-let isRecording = false;
-let currentStep = 'start';
-let synth = window.speechSynthesis;
-let currentLanguage = 'hinglish';
-
-// Text-to-Speech function
-function speakText(text, language = 'hi-IN') {
-    return new Promise((resolve) => {
-        // Stop any current speech
-        synth.cancel();
+# Configuration
+class VoiceConfig:
+    def __init__(self):
+        self.current_language = "hinglish"
+        self.user_name = ""
+        self.user_occupation = ""
+        self.conversation_step = "start"
+        self.query_count = 0
+        self.max_queries = 5
+        self.conversation_log = []
         
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Set language
-        if (language === 'hi-IN' || language === 'hinglish') {
-            utterance.lang = 'hi-IN';
-            utterance.rate = 0.9;
-        } else {
-            utterance.lang = 'en-IN';
-            utterance.rate = 0.9;
-        }
-        
-        utterance.volume = 1;
-        utterance.pitch = 1;
-        
-        utterance.onend = function() {
-            resolve();
-        };
-        
-        utterance.onerror = function() {
-            resolve();
-        };
-        
-        synth.speak(utterance);
-    });
-}
+        # Load schemes data
+        self.schemes_data = self.load_schemes_data()
+    
+    def load_schemes_data(self):
+        """Load CSV data"""
+        csv_path = "Government_schemes_final_english.csv"
+        if os.path.exists(csv_path):
+            return pd.read_csv(csv_path)
+        else:
+            # Demo data
+            return pd.DataFrame({
+                'Name': [
+                    'PM-KISAN Samman Nidhi Yojana',
+                    'Pradhan Mantri Matsya Sampada Yojana',
+                    'Mahila Shakti Kendra Scheme',
+                    'Pradhan Mantri Mudra Yojana',
+                    'National Scholarship Portal'
+                ],
+                'Department': ['Agriculture', 'Fisheries', 'Women Development', 'MSME', 'Education'],
+                'Details': [
+                    'Direct income support to farmers providing Rs 6000 per year',
+                    'Comprehensive development of fisheries sector with financial assistance',
+                    'Women empowerment through skill development and training programs',
+                    'Micro finance scheme for small businesses providing collateral-free loans',
+                    'Educational scholarships for students from economically weaker sections'
+                ],
+                'Benefits': [
+                    'Rs 6000 annual income support directly to bank account',
+                    'Subsidized boats and equipment up to Rs 3 lakh',
+                    'Free skill training and employment support',
+                    'Collateral-free loans up to Rs 10 lakh',
+                    'Educational scholarships and fee reimbursement'
+                ],
+                'Eligibility': [
+                    'Small and marginal farmers with land records',
+                    'Registered fishermen and fish farmers',
+                    'Women aged 18-65 from rural areas',
+                    'Non-defaulter individuals for business loans',
+                    'Students from economically weaker sections'
+                ]
+            })
 
-// Speech Recognition
-async function listenForSpeech(timeout = 10000) {
-    return new Promise(async (resolve) => {
-        try {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                resolve('Mock: Kisan yojana batao');
-                return;
+# Global config
+config = VoiceConfig()
+
+class VoiceAssistant:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        
+    def text_to_speech(self, text: str, language: str = "hi") -> str:
+        """Convert text to speech and return audio file path"""
+        try:
+            # Language mapping
+            lang_code = "hi" if language in ["hindi", "hinglish"] else "en"
+            
+            # Create TTS
+            tts = gTTS(text=text, lang=lang_code, slow=False)
+            
+            # Save to temp file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+            tts.save(temp_file.name)
+            
+            return temp_file.name
+            
+        except Exception as e:
+            print(f"TTS Error: {e}")
+            return None
+    
+    def speech_to_text(self, audio_path: str) -> str:
+        """Convert speech to text"""
+        try:
+            # Load audio
+            with sr.AudioFile(audio_path) as source:
+                audio = self.recognizer.record(source)
+            
+            # Recognize speech
+            text = self.recognizer.recognize_google(
+                audio, 
+                language="hi-IN"  # Support both Hindi and English
+            )
+            
+            return text.strip()
+            
+        except sr.UnknownValueError:
+            return "समझ नहीं आया, कृपया फिर से कहें"
+        except sr.RequestError as e:
+            print(f"Speech recognition error: {e}")
+            return "आवाज़ साफ नहीं है"
+        except Exception as e:
+            print(f"Audio processing error: {e}")
+            return "ऑडियो प्रोसेसिंग में समस्या"
+    
+    def search_schemes(self, query: str, occupation: str = None) -> List[Dict]:
+        """Search schemes based on voice query"""
+        df = config.schemes_data
+        
+        # Process query
+        query_words = query.lower().split()
+        
+        # Create search text
+        search_text = (
+            df['Name'].fillna('').astype(str) + ' ' +
+            df['Department'].fillna('').astype(str) + ' ' +
+            df['Details'].fillna('').astype(str) + ' ' +
+            df['Benefits'].fillna('').astype(str)
+        ).str.lower()
+        
+        # Search
+        mask = pd.Series([False] * len(df))
+        for word in query_words:
+            if len(word) > 2:
+                mask |= search_text.str.contains(word, na=False, regex=False)
+        
+        # Occupation filter
+        if occupation:
+            occ_keywords = {
+                'farmer': ['farmer', 'agriculture', 'farming', 'kisan'],
+                'fisherman': ['fish', 'marine', 'boat', 'matsya'],
+                'women': ['women', 'woman', 'female', 'mahila'],
+                'business': ['business', 'entrepreneur', 'mudra'],
+                'student': ['education', 'scholarship', 'student']
             }
             
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            
-            recognition.lang = currentLanguage === 'english' ? 'en-IN' : 'hi-IN';
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-            
-            let timeoutId = setTimeout(() => {
-                recognition.stop();
-                resolve('timeout');
-            }, timeout);
-            
-            recognition.onresult = function(event) {
-                clearTimeout(timeoutId);
-                const transcript = event.results[0][0].transcript;
-                resolve(transcript);
-            };
-            
-            recognition.onerror = function(event) {
-                clearTimeout(timeoutId);
-                console.error('Speech recognition error:', event.error);
-                resolve('Mock: Default response');
-            };
-            
-            recognition.start();
-            
-        } catch (error) {
-            console.error('Speech recognition failed:', error);
-            resolve('Mock: Default response');
-        }
-    });
-}
+            if occupation in occ_keywords:
+                occ_mask = pd.Series([False] * len(df))
+                for keyword in occ_keywords[occupation]:
+                    occ_mask |= search_text.str.contains(keyword, na=False, regex=False)
+                mask &= occ_mask
+        
+        results = df[mask].head(3)
+        return results.to_dict('records') if not results.empty else []
 
-// Update UI status
-function updateStatus(status, message) {
-    const statusDiv = parent.document.getElementById('voice-status');
-    if (statusDiv) {
-        let statusClass = 'status-ready';
-        if (status === 'speaking') statusClass = 'status-speaking';
-        if (status === 'listening') statusClass = 'status-listening';
-        
-        statusDiv.innerHTML = `
-            <span class="status-indicator ${statusClass}"></span>
-            ${message}
-        `;
-    }
-}
+# Initialize assistant
+assistant = VoiceAssistant()
 
-// Main conversation flow
-async function startConversation() {
-    console.log('Starting voice conversation...');
+def start_conversation() -> Tuple[str, str]:
+    """Start the voice conversation"""
+    global config
     
-    // Welcome message
-    updateStatus('speaking', '🤖 Assistant is speaking...');
-    await speakText('नमस्कार! Government Schemes Voice Assistant में आपका स्वागत है।', 'hi-IN');
+    # Reset config
+    config.conversation_step = "language_selection"
+    config.query_count = 0
+    config.conversation_log = []
     
-    // Language selection
-    await speakText('कृपया अपनी भाषा चुनें। Hindi के लिए हिंदी कहें, English के लिए इंग्लिश कहें, या Hinglish के लिए हिंग्लिश कहें।', 'hi-IN');
+    # Welcome message
+    welcome_text = "नमस्कार! Government Schemes Voice Assistant में आपका स्वागत है। कृपया अपनी भाषा चुनें - Hindi, English, या Hinglish?"
     
-    updateStatus('listening', '🎤 Listening for language choice...');
-    const languageChoice = await listenForSpeech(8000);
+    # Generate audio
+    audio_path = assistant.text_to_speech(welcome_text, "hi")
     
-    // Process language
-    let selectedLanguage = 'hinglish';
-    if (languageChoice.toLowerCase().includes('english') || languageChoice.toLowerCase().includes('अंग्रेजी')) {
-        selectedLanguage = 'english';
-    } else if (languageChoice.toLowerCase().includes('hindi') || languageChoice.toLowerCase().includes('हिंदी')) {
-        selectedLanguage = 'hindi';
-    }
-    
-    currentLanguage = selectedLanguage;
-    
-    // Confirm language
-    const langConfirmations = {
-        'english': 'You selected English. Let us continue.',
-        'hindi': 'आपने हिंदी चुनी है। आगे बढ़ते हैं।',
-        'hinglish': 'Aapne Hinglish select kiya है। Chaliye continue karte hain।'
-    };
-    
-    updateStatus('speaking', '🤖 Assistant is speaking...');
-    await speakText(langConfirmations[selectedLanguage]);
-    
-    // Get name
-    const namePrompts = {
-        'english': 'What is your name?',
-        'hindi': 'आपका नाम क्या है?',
-        'hinglish': 'Aapka naam kya hai?'
-    };
-    
-    await speakText(namePrompts[selectedLanguage]);
-    updateStatus('listening', '🎤 Listening for your name...');
-    const userName = await listenForSpeech(8000);
-    
-    // Thank user
-    const thankYouMessages = {
-        'english': `Thank you, ${userName}।`,
-        'hindi': `धन्यवाद, ${userName}।`,
-        'hinglish': `Thank you, ${userName}।`
-    };
-    
-    updateStatus('speaking', '🤖 Assistant is speaking...');
-    await speakText(thankYouMessages[selectedLanguage]);
-    
-    // Get occupation
-    const occupationPrompts = {
-        'english': 'Tell me your occupation or location for better scheme suggestions.',
-        'hindi': 'अपना व्यवसाय या स्थान बताएं ताकि मैं बेहतर योजनाएं सुझा सकूं।',
-        'hinglish': 'Apna occupation ya location batayiye better schemes suggest karne ke liye।'
-    };
-    
-    await speakText(occupationPrompts[selectedLanguage]);
-    updateStatus('listening', '🎤 Listening for occupation/location...');
-    const occupation = await listenForSpeech(10000);
-    
-    // Start main conversation
-    const conversationPrompts = {
-        'english': 'How can I help you with government schemes?',
-        'hindi': 'मैं सरकारी योजनाओं के बारे में आपकी कैसे सहायता कर सकता हूँ?',
-        'hinglish': 'Main government schemes ke baare mein aapki kaise help kar sakta hoon?'
-    };
-    
-    updateStatus('speaking', '🤖 Assistant is speaking...');
-    await speakText(conversationPrompts[selectedLanguage]);
-    
-    // Send data to Streamlit
-    window.parent.postMessage({
-        type: 'conversation_complete',
-        data: {
-            language: selectedLanguage,
-            name: userName,
-            occupation: occupation,
-            step: 'main_conversation'
-        }
-    }, '*');
-    
-    // Start query loop
-    await handleQueries(selectedLanguage, userName);
-}
+    return welcome_text, audio_path
 
-async function handleQueries(language, userName) {
-    let queryCount = 0;
-    const maxQueries = 5;
+def process_language_selection(audio_input) -> Tuple[str, str]:
+    """Process language selection from voice"""
+    global config
     
-    while (queryCount < maxQueries) {
-        updateStatus('listening', `🎤 Query ${queryCount + 1}/${maxQueries} - Listening...`);
-        
-        const query = await listenForSpeech(15000);
-        
-        if (query === 'timeout' || query.toLowerCase().includes('exit') || query.toLowerCase().includes('bye')) {
-            break;
-        }
-        
-        queryCount++;
-        
-        // Send query to Streamlit for processing
-        window.parent.postMessage({
-            type: 'process_query',
-            data: {
-                query: query,
-                language: language,
-                queryCount: queryCount
-            }
-        }, '*');
-        
-        // Wait for response
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Mock response for now
-        const responses = {
-            'english': `I found relevant schemes for your query: ${query}. Would you like more details?`,
-            'hindi': `आपकी क्वेरी के लिए संबंधित योजनाएं मिलीं: ${query}। क्या आप और जानकारी चाहते हैं?`,
-            'hinglish': `Aapki query ke liye relevant schemes mili: ${query}। Kya aap aur details chahte hain?`
-        };
-        
-        updateStatus('speaking', '🤖 Assistant is responding...');
-        await speakText(responses[language]);
-    }
+    if audio_input is None:
+        return "कृपया आवाज़ में अपनी भाषा बताएं", None
     
-    // End conversation
-    const endMessages = {
-        'english': `Thank you for contacting us, ${userName}। Have a nice day!`,
-        'hindi': `हमसे संपर्क करने के लिए धन्यवाद, ${userName}। आपका दिन शुभ हो!`,
-        'hinglish': `Humse contact karne ke liye thank you, ${userName}। Aapka din shubh ho!`
-    };
+    # Convert speech to text
+    recognized_text = assistant.speech_to_text(audio_input)
+    print(f"Language selection heard: {recognized_text}")
     
-    updateStatus('speaking', '🤖 Assistant is speaking...');
-    await speakText(endMessages[language]);
+    # Process language choice
+    text_lower = recognized_text.lower()
     
-    updateStatus('ready', '✅ Conversation completed. Click Start to begin again.');
-}
-
-// Initialize
-window.startVoiceAssistant = startConversation;
-console.log('Gemini-style voice assistant loaded');
-</script>
-"""
-
-# Initialize session state
-if 'conversation_active' not in st.session_state:
-    st.session_state.conversation_active = False
-if 'conversation_data' not in st.session_state:
-    st.session_state.conversation_data = {}
-if 'conversation_log' not in st.session_state:
-    st.session_state.conversation_log = []
-
-# Load schemes data
-@st.cache_data
-def load_schemes_data():
-    csv_path = "Government_schemes_final_english.csv"
-    if os.path.exists(csv_path):
-        return pd.read_csv(csv_path)
+    if any(word in text_lower for word in ["english", "अंग्रेजी", "इंग्लिश"]):
+        config.current_language = "english"
+        response = "You selected English. Let's continue."
+    elif any(word in text_lower for word in ["hindi", "हिंदी"]):
+        config.current_language = "hindi"
+        response = "आपने हिंदी चुनी है। आगे बढ़ते हैं।"
     else:
-        # Demo data
-        return pd.DataFrame({
-            'Name': [
-                'PM-KISAN Samman Nidhi Yojana',
-                'Pradhan Mantri Matsya Sampada Yojana',
-                'Mahila Shakti Kendra Scheme',
-                'Pradhan Mantri Mudra Yojana'
-            ],
-            'Department': ['Agriculture', 'Fisheries', 'Women Development', 'MSME'],
-            'Details': [
-                'Direct income support to farmers',
-                'Fisheries development with financial assistance',
-                'Women empowerment programs',
-                'Micro finance for small businesses'
-            ],
-            'Benefits': [
-                'Rs 6000 annual income support',
-                'Subsidized equipment up to Rs 3 lakh',
-                'Free skill training',
-                'Collateral-free loans'
-            ]
-        })
+        config.current_language = "hinglish"
+        response = "Aapne Hinglish select kiya है। Chaliye continue karte hain।"
+    
+    # Move to next step
+    config.conversation_step = "name_collection"
+    
+    # Ask for name
+    name_prompts = {
+        "english": "What is your name?",
+        "hindi": "आपका नाम क्या है?",
+        "hinglish": "Aapka naam kya hai?"
+    }
+    
+    full_response = response + " " + name_prompts[config.current_language]
+    audio_path = assistant.text_to_speech(full_response, config.current_language)
+    
+    return full_response, audio_path
 
-schemes_data = load_schemes_data()
+def process_name_collection(audio_input) -> Tuple[str, str]:
+    """Process name collection from voice"""
+    global config
+    
+    if audio_input is None:
+        return "कृपया अपना नाम बताएं", None
+    
+    # Convert speech to text
+    recognized_name = assistant.speech_to_text(audio_input)
+    config.user_name = recognized_name
+    
+    print(f"Name collected: {recognized_name}")
+    
+    # Thank user and ask for occupation
+    thank_you_templates = {
+        "english": f"Thank you, {recognized_name}. Tell me your occupation or location for better scheme suggestions.",
+        "hindi": f"धन्यवाद, {recognized_name}। अपना व्यवसाय या स्थान बताएं ताकि मैं बेहतर योजनाएं सुझा सकूं।",
+        "hinglish": f"Thank you, {recognized_name}। Apna occupation ya location batayiye better schemes suggest karne ke liye।"
+    }
+    
+    config.conversation_step = "occupation_collection"
+    response = thank_you_templates[config.current_language]
+    audio_path = assistant.text_to_speech(response, config.current_language)
+    
+    return response, audio_path
 
-def search_schemes_voice(query, occupation=None):
-    """Voice-optimized scheme search"""
-    df = schemes_data
+def process_occupation_collection(audio_input) -> Tuple[str, str]:
+    """Process occupation collection from voice"""
+    global config
     
-    # Simple keyword matching
-    search_text = (
-        df['Name'].fillna('').astype(str) + ' ' +
-        df['Department'].fillna('').astype(str) + ' ' +
-        df['Details'].fillna('').astype(str)
-    ).str.lower()
+    if audio_input is None:
+        return "कृपया अपना व्यवसाय बताएं", None
     
-    query_words = query.lower().split()
-    mask = pd.Series([False] * len(df))
+    # Convert speech to text
+    recognized_occupation = assistant.speech_to_text(audio_input)
     
-    for word in query_words:
-        if len(word) > 2:
-            mask |= search_text.str.contains(word, na=False, regex=False)
+    # Parse occupation
+    text_lower = recognized_occupation.lower()
+    if any(word in text_lower for word in ["farmer", "kisan", "किसान", "खेती"]):
+        config.user_occupation = "farmer"
+    elif any(word in text_lower for word in ["fish", "machhuara", "मछुआरा"]):
+        config.user_occupation = "fisherman"
+    elif any(word in text_lower for word in ["women", "mahila", "महिला"]):
+        config.user_occupation = "women"
+    elif any(word in text_lower for word in ["business", "व्यापार"]):
+        config.user_occupation = "business"
+    else:
+        config.user_occupation = "general"
     
-    results = df[mask].head(3)
-    return results.to_dict('records') if not results.empty else []
+    print(f"Occupation: {config.user_occupation}")
+    
+    # Start main conversation
+    query_prompts = {
+        "english": "How can I help you with government schemes?",
+        "hindi": "मैं सरकारी योजनाओं के बारे में आपकी कैसे सहायता कर सकता हूँ?",
+        "hinglish": "Main government schemes ke baare mein aapki kaise help kar sakta hoon?"
+    }
+    
+    config.conversation_step = "main_conversation"
+    response = query_prompts[config.current_language]
+    audio_path = assistant.text_to_speech(response, config.current_language)
+    
+    return response, audio_path
 
-# Main Interface
-def main():
-    st.markdown("""
-    <div class="chat-container">
-        <div class="assistant-avatar">🤖</div>
-        <h1 style="text-align: center; margin-bottom: 2rem;">Voice Government Assistant</h1>
-        <p style="text-align: center; font-size: 1.1rem; margin-bottom: 2rem; opacity: 0.9;">
-            Gemini-style voice interaction for government schemes
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+def process_main_query(audio_input) -> Tuple[str, str]:
+    """Process main conversation queries"""
+    global config
     
-    # Voice status indicator
-    st.markdown("""
-    <div class="voice-status" id="voice-status">
-        <span class="status-indicator status-ready"></span>
-        Ready to start conversation
-    </div>
-    """, unsafe_allow_html=True)
+    if audio_input is None:
+        return "कृपया अपना सवाल पूछें", None
     
-    # Main voice controls
-    if not st.session_state.conversation_active:
-        st.markdown("""
-        <div class="voice-controls">
-            <h3>🎤 Click to Start Voice Conversation</h3>
-            <p>The assistant will guide you through:</p>
-            <div style="text-align: left; margin: 1rem 0; max-width: 400px; margin-left: auto; margin-right: auto;">
-                <div class="conversation-step">1️⃣ Language Selection</div>
-                <div class="conversation-step">2️⃣ Name Collection</div>
-                <div class="conversation-step">3️⃣ Occupation/Location</div>
-                <div class="conversation-step">4️⃣ Voice Queries (5 max)</div>
-                <div class="conversation-step">5️⃣ Session End</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    if config.query_count >= config.max_queries:
+        # End conversation
+        end_messages = {
+            "english": f"Thank you for contacting us, {config.user_name}. Have a nice day!",
+            "hindi": f"हमसे संपर्क करने के लिए धन्यवाद, {config.user_name}। आपका दिन शुभ हो!",
+            "hinglish": f"Humse contact karne ke liye thank you, {config.user_name}। Aapka din shubh ho!"
+        }
         
-        if st.button("🎤 Start Voice Assistant", key="start_voice", help="Click to begin voice conversation"):
-            st.session_state.conversation_active = True
-            st.markdown("""
-            <div class="bot-speaking">
-                <div class="audio-visualizer">
-                    <div class="audio-bar"></div>
-                    <div class="audio-bar"></div>
-                    <div class="audio-bar"></div>
-                    <div class="audio-bar"></div>
-                    <div class="audio-bar"></div>
+        config.conversation_step = "completed"
+        response = end_messages[config.current_language]
+        audio_path = assistant.text_to_speech(response, config.current_language)
+        return response, audio_path
+    
+    # Convert speech to text
+    query = assistant.speech_to_text(audio_input)
+    config.query_count += 1
+    
+    print(f"Query {config.query_count}: {query}")
+    
+    # Search schemes
+    schemes = assistant.search_schemes(query, config.user_occupation)
+    
+    # Generate response
+    if schemes:
+        scheme = schemes[0]
+        response_templates = {
+            "english": f"I found {len(schemes)} relevant schemes. The main scheme is {scheme['Name']}. {scheme['Benefits'][:100]}",
+            "hindi": f"मुझे {len(schemes)} संबंधित योजनाएं मिलीं। मुख्य योजना है {scheme['Name']}। {scheme['Benefits'][:100]}",
+            "hinglish": f"Mujhe {len(schemes)} relevant schemes mili। Main scheme hai {scheme['Name']}। {scheme['Benefits'][:100]}"
+        }
+    else:
+        response_templates = {
+            "english": "I couldn't find specific schemes for your query. Please try different keywords.",
+            "hindi": "आपकी क्वेरी के लिए कोई विशेष योजना नहीं मिली। कृपया अलग keywords try करें।",
+            "hinglish": "Aapki query ke liye koi specific scheme nahi mili। Different keywords try kariye।"
+        }
+    
+    response = response_templates[config.current_language]
+    
+    # Add query continuation
+    if config.query_count < config.max_queries:
+        continue_prompts = {
+            "english": " Any other questions?",
+            "hindi": " कोई और सवाल?",
+            "hinglish": " Aur koi question?"
+        }
+        response += continue_prompts[config.current_language]
+    
+    audio_path = assistant.text_to_speech(response, config.current_language)
+    return response, audio_path
+
+def handle_voice_input(audio_input) -> Tuple[str, str]:
+    """Main voice input handler"""
+    global config
+    
+    if config.conversation_step == "start":
+        return start_conversation()
+    elif config.conversation_step == "language_selection":
+        return process_language_selection(audio_input)
+    elif config.conversation_step == "name_collection":
+        return process_name_collection(audio_input)
+    elif config.conversation_step == "occupation_collection":
+        return process_occupation_collection(audio_input)
+    elif config.conversation_step == "main_conversation":
+        return process_main_query(audio_input)
+    elif config.conversation_step == "completed":
+        return "Conversation completed. Please restart to begin again.", None
+    else:
+        return "Something went wrong. Please restart.", None
+
+def reset_conversation():
+    """Reset conversation state"""
+    global config
+    config.conversation_step = "start"
+    config.query_count = 0
+    config.user_name = ""
+    config.user_occupation = ""
+    config.conversation_log = []
+    return "Conversation reset. Click 'Start Voice Assistant' to begin.", None
+
+# Create Gradio Interface
+def create_interface():
+    """Create the Gradio voice interface"""
+    
+    with gr.Blocks(
+        title="🎤 Voice Government Schemes Assistant",
+        theme=gr.themes.Soft(),
+        css="""
+        .gradio-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .voice-container {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 1rem 0;
+            backdrop-filter: blur(10px);
+        }
+        """
+    ) as demo:
+        
+        gr.HTML("""
+        <div style="text-align: center; padding: 2rem; color: white;">
+            <h1>🎤 Voice Government Schemes Assistant</h1>
+            <p style="font-size: 1.2rem;">Complete Voice-to-Voice Conversation Experience</p>
+            <p>🗣️ Bot will speak first → 👂 You respond with voice → 🔄 Natural conversation</p>
+        </div>
+        """)
+        
+        with gr.Row():
+            with gr.Column(scale=1):
+                # Voice input
+                audio_input = gr.Audio(
+                    sources=["microphone"],
+                    type="filepath",
+                    label="🎤 Click to Record Your Response",
+                    interactive=True
+                )
+                
+                # Control buttons
+                start_btn = gr.Button("🎤 Start Voice Assistant", variant="primary", size="lg")
+                reset_btn = gr.Button("🔄 Reset Conversation", variant="secondary")
+                
+            with gr.Column(scale=1):
+                # Bot response (text)
+                response_text = gr.Textbox(
+                    label="🤖 Assistant Response",
+                    interactive=False,
+                    lines=4
+                )
+                
+                # Bot response (audio)
+                response_audio = gr.Audio(
+                    label="🔊 Assistant Voice",
+                    interactive=False,
+                    autoplay=True  # Important: Auto-play bot response
+                )
+                
+                # Conversation status
+                status_display = gr.HTML("""
+                <div class="voice-container">
+                    <h3>📊 Conversation Status</h3>
+                    <p>🔵 Ready to start</p>
+                    <ol>
+                        <li>Language Selection</li>
+                        <li>Name Collection</li>
+                        <li>Occupation/Location</li>
+                        <li>Voice Queries (5 max)</li>
+                        <li>Session End</li>
+                    </ol>
                 </div>
-                <h3>🤖 Voice Assistant is starting...</h3>
-                <p>Please allow microphone access when prompted</p>
-            </div>
-            
-            <script>
-            setTimeout(() => {
-                if (window.startVoiceAssistant) {
-                    window.startVoiceAssistant();
-                }
-            }, 1000);
-            </script>
-            """, unsafe_allow_html=True)
-            st.rerun()
-    
-    else:
-        # Show active conversation
-        st.markdown("""
-        <div class="user-listening">
-            <div class="audio-visualizer">
-                <div class="audio-bar"></div>
-                <div class="audio-bar"></div>
-                <div class="audio-bar"></div>
-                <div class="audio-bar"></div>
-                <div class="audio-bar"></div>
-            </div>
-            <h3>🎤 Voice Conversation Active</h3>
-            <p>Speaking with the voice assistant...</p>
+                """)
+        
+        # Event handlers
+        start_btn.click(
+            fn=start_conversation,
+            outputs=[response_text, response_audio]
+        )
+        
+        audio_input.change(
+            fn=handle_voice_input,
+            inputs=[audio_input],
+            outputs=[response_text, response_audio]
+        )
+        
+        reset_btn.click(
+            fn=reset_conversation,
+            outputs=[response_text, response_audio]
+        )
+        
+        gr.HTML("""
+        <div style="text-align: center; padding: 1rem; color: white; opacity: 0.8;">
+            <p>🎯 Perfect Voice Experience: Bot speaks first, you respond, natural conversation flow!</p>
         </div>
-        """, unsafe_allow_html=True)
-        
-        # Show conversation progress
-        if st.session_state.conversation_data:
-            data = st.session_state.conversation_data
-            st.markdown(f"""
-            <div class="voice-status">
-                <h4>📊 Conversation Progress</h4>
-                <div class="conversation-step step-completed">✅ Language: {data.get('language', 'Not set').title()}</div>
-                <div class="conversation-step step-completed">✅ Name: {data.get('name', 'Not provided')}</div>
-                <div class="conversation-step step-completed">✅ Occupation: {data.get('occupation', 'Not specified')}</div>
-                <div class="conversation-step">🔄 Processing queries...</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Reset button
-        if st.button("🔄 Reset Conversation", key="reset_voice"):
-            st.session_state.conversation_active = False
-            st.session_state.conversation_data = {}
-            st.session_state.conversation_log = []
-            st.rerun()
+        """)
     
-    # Add JavaScript
-    st.components.v1.html(voice_js, height=0)
-    
-    # Show conversation log if available
-    if st.session_state.conversation_log:
-        st.markdown("### 📝 Conversation Log")
-        for log_entry in st.session_state.conversation_log:
-            st.markdown(f"<div class='conversation-step'>{log_entry}</div>", unsafe_allow_html=True)
+    return demo
 
-# Handle messages from JavaScript
-if 'last_message' not in st.session_state:
-    st.session_state.last_message = None
-
-# Check for new messages (simplified)
-# In production, use st.components.v1 bidirectional communication
-
+# Launch the app
 if __name__ == "__main__":
-    main()
+    # Create and launch interface
+    demo = create_interface()
+    
+    # Launch with specific settings for voice
+    demo.launch(
+        server_name="0.0.0.0",  # Allow external access
+        server_port=7860,
+        share=True,  # Create public link
+        inbrowser=True,  # Auto-open browser
+        show_error=True
+    )
