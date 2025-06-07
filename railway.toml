@@ -2,7 +2,5 @@
 builder = "NIXPACKS"
 
 [deploy]
-healthcheckPath = "/"
-healthcheckTimeout = 300
-restartPolicyType = "ON_FAILURE"
 startCommand = "python telegram_bot.py"
+restartPolicyType = "ON_FAILURE"

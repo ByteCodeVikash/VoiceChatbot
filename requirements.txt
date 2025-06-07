@@ -1,5 +1,4 @@
-# requirements.txt create/update karo:
-echo "python-telegram-bot==20.7
+python-telegram-bot==20.7
 gtts==2.5.1
 SpeechRecognition==3.10.4
 pydub==0.25.1
@@ -12,4 +11,3 @@ langchain-groq==0.1.5
 langchain==0.2.11
 langchain-huggingface==0.0.3
 chromadb==0.4.15
-sqlite3" > requirements.txt
