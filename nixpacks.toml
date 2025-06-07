@@ -1,8 +1,12 @@
+# nixpacks.toml
 [phases.setup]
-nixPkgs = ['python312', 'pip']
+nixPkgs = ["python312", "python312Packages.pip", "nodejs", "gcc"]
+
+[phases.install]
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
 
 [phases.build]
-cmds = ['pip install -r requirements.txt']
+cmds = ["echo 'Build phase'"]
 
 [start]
-cmd = 'uvicorn app:app --host 0.0.0.0 --port $PORT'
+cmd = "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app"
