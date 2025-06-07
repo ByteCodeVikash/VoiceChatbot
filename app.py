@@ -1,99 +1,266 @@
-# app.py - MAIN RAILWAY SERVER
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 import json
-import asyncio
 import os
-from pathlib import Path
-
-# Import your existing code
-from voice_assistant import EnhancedVoiceAssistant
-from config import CONFIG
+import pandas as pd
+import sqlite3
+from rapidfuzz import fuzz
 
 app = FastAPI(title="Government Schemes Voice Assistant")
 
-# Serve static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Simple database class without RAG
+class SimpleSchemeDatabase:
+    def __init__(self, csv_path):
+        self.csv_path = csv_path
+        self.schemes = []
+        self.load_data()
+    
+    def load_data(self):
+        """Load CSV data"""
+        try:
+            if os.path.exists(self.csv_path):
+                df = pd.read_csv(self.csv_path)
+                self.schemes = df.to_dict('records')
+                print(f"✅ Loaded {len(self.schemes)} schemes")
+            else:
+                print(f"❌ CSV file not found: {self.csv_path}")
+        except Exception as e:
+            print(f"❌ Error loading CSV: {e}")
+    
+    def search_schemes(self, query, limit=5):
+        """Simple text search"""
+        if not self.schemes:
+            return []
+        
+        query_lower = query.lower()
+        results = []
+        
+        for scheme in self.schemes:
+            score = 0
+            
+            # Search in name
+            name = str(scheme.get('Name', '')).lower()
+            if query_lower in name:
+                score += 3
+            
+            # Search in details
+            details = str(scheme.get('Details', '')).lower()
+            if query_lower in details:
+                score += 2
+            
+            # Search in benefits
+            benefits = str(scheme.get('Benefits', '')).lower()
+            if query_lower in benefits:
+                score += 1
+            
+            # Search in department
+            dept = str(scheme.get('Department', '')).lower()
+            if query_lower in dept:
+                score += 1
+            
+            if score > 0:
+                scheme_copy = scheme.copy()
+                scheme_copy['score'] = score
+                results.append(scheme_copy)
+        
+        # Sort by score
+        results.sort(key=lambda x: x['score'], reverse=True)
+        return results[:limit]
 
-# Global assistant instance
-assistant = None
+# Global database
+db = None
 
 @app.on_event("startup")
 async def startup_event():
-    global assistant
-    print("🚀 Starting Railway Voice Assistant...")
-    assistant = EnhancedVoiceAssistant()
-    print("✅ Assistant initialized")
+    global db
+    print("🚀 Starting Simple Schemes Assistant...")
+    db = SimpleSchemeDatabase("Government_schemes_final_english.csv")
+    print("✅ Database ready")
 
-# app.py - Update the get_homepage function
 @app.get("/")
-async def get_homepage():
-    """Serve the Gemini-style interface"""
-    return FileResponse('static/index.html')
-
-# Add static files mount
-from fastapi.staticfiles import StaticFiles
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    print(f"🔌 Client connected: {websocket.client}")
-    
-    try:
-        while True:
-            # Receive message
-            data = await websocket.receive()
+async def homepage():
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Government Schemes Assistant</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                max-width: 900px; 
+                margin: 0 auto; 
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .container { 
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                text-align: center; 
+            }
+            h1 { color: #2c3e50; margin-bottom: 10px; }
+            .subtitle { color: #7f8c8d; margin-bottom: 30px; }
+            input { 
+                width: 70%; 
+                padding: 15px; 
+                margin: 10px; 
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+            }
+            button { 
+                padding: 15px 25px; 
+                margin: 10px; 
+                font-size: 16px;
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            button:hover { background-color: #2980b9; }
+            .response { 
+                background: #ecf0f1; 
+                padding: 20px; 
+                margin: 20px 0; 
+                border-radius: 8px;
+                text-align: left;
+                border-left: 4px solid #3498db;
+            }
+            .scheme { 
+                background: white;
+                margin: 15px 0;
+                padding: 15px;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .scheme h3 { color: #2c3e50; margin-top: 0; }
+            .loading { color: #f39c12; }
+            .error { color: #e74c3c; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🤖 Government Schemes Assistant</h1>
+            <p class="subtitle">Ask about government schemes in Hindi, English, or Hinglish!</p>
             
-            if "text" in data:
-                # Text message
-                message = json.loads(data["text"])
-                if message["type"] == "text":
-                    query = message["message"]
-                    
-                    # Process with your existing logic
-                    response = await process_query(query)
-                    
-                    # Send response
-                    await websocket.send_text(json.dumps({
-                        "type": "response",
-                        "message": response
-                    }))
+            <div>
+                <input type="text" id="questionInput" placeholder="Type your question here (e.g., farmer scheme, women loan, fisherman subsidy)">
+                <br>
+                <button onclick="askQuestion()">🔍 Search Schemes</button>
+            </div>
             
-            elif "bytes" in data:
-                # Audio data (for future voice implementation)
-                audio_data = data["bytes"]
-                # TODO: Implement voice processing
-                pass
+            <div id="response"></div>
+            
+            <div style="margin-top: 30px; font-size: 14px; color: #7f8c8d;">
+                <p><strong>Examples:</strong></p>
+                <p>• "farmer scheme" • "महिला योजना" • "kisan subsidy" • "fisherman loan"</p>
+            </div>
+        </div>
+
+        <script>
+            async function askQuestion() {
+                const input = document.getElementById('questionInput');
+                const question = input.value.trim();
                 
-    except Exception as e:
-        print(f"❌ WebSocket error: {e}")
-    finally:
-        print("🔌 Client disconnected")
+                if (!question) {
+                    alert('Please enter a question!');
+                    return;
+                }
+                
+                document.getElementById('response').innerHTML = 
+                    '<p class="loading">🔍 Searching schemes...</p>';
+                
+                try {
+                    const response = await fetch('/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: question })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.schemes && data.schemes.length > 0) {
+                        let html = `<div class="response">
+                            <h2>📋 Found ${data.schemes.length} Relevant Schemes:</h2>`;
+                        
+                        data.schemes.forEach((scheme, index) => {
+                            html += `
+                                <div class="scheme">
+                                    <h3>${index + 1}. ${scheme.Name || 'Government Scheme'}</h3>
+                                    <p><strong>Department:</strong> ${scheme.Department || 'N/A'}</p>
+                                    <p><strong>Details:</strong> ${scheme.Details || 'N/A'}</p>
+                                    <p><strong>Benefits:</strong> ${scheme.Benefits || 'N/A'}</p>
+                                    <p><strong>Eligibility:</strong> ${scheme.Eligibility || 'N/A'}</p>
+                                </div>
+                            `;
+                        });
+                        
+                        html += '</div>';
+                        document.getElementById('response').innerHTML = html;
+                    } else {
+                        document.getElementById('response').innerHTML = 
+                            '<div class="response error">❌ No schemes found. Try different keywords like "farmer", "women", "fisherman", "loan", "subsidy".</div>';
+                    }
+                    
+                } catch (error) {
+                    document.getElementById('response').innerHTML = 
+                        '<div class="response error">❌ Error occurred. Please try again.</div>';
+                    console.error('Error:', error);
+                }
+            }
+            
+            document.getElementById('questionInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') askQuestion();
+            });
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
 
-async def process_query(query: str) -> str:
-    """Process user query using existing assistant logic"""
+@app.post("/search")
+async def search_schemes(request: Request):
     try:
-        global assistant
+        data = await request.json()
+        query = data.get("query", "")
         
-        if not assistant:
-            return "Assistant not ready. Please refresh the page."
+        if not query:
+            return {"schemes": [], "message": "Please provide a search query"}
         
-        # Use your existing search logic
-        schemes = assistant.find_relevant_schemes(query, top_n=3)
-        response = assistant.format_scheme_response(schemes, query, "english")
+        global db
+        if not db:
+            return {"schemes": [], "message": "Database not ready"}
         
-        return response
+        # Search schemes
+        schemes = db.search_schemes(query, limit=5)
+        
+        return {
+            "schemes": schemes,
+            "query": query,
+            "count": len(schemes)
+        }
         
     except Exception as e:
-        print(f"❌ Query processing error: {e}")
-        return "Sorry, I encountered an error processing your request."
+        print(f"Search error: {e}")
+        return {"schemes": [], "message": "Search failed"}
 
 @app.get("/health")
-async def health_check():
-    """Health check for Railway"""
-    return {"status": "healthy", "service": "government-schemes-assistant"}
+async def health():
+    return {"status": "OK", "message": "Government Schemes Assistant is running!"}
+
+@app.get("/stats")
+async def get_stats():
+    global db
+    if db:
+        return {
+            "total_schemes": len(db.schemes),
+            "status": "active"
+        }
+    return {"total_schemes": 0, "status": "inactive"}
 
 if __name__ == "__main__":
     import uvicorn
