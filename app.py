@@ -1,513 +1,348 @@
-#!/usr/bin/env python3
-"""
-Ultra Simple Government Schemes Assistant
-No external dependencies - Pure Python!
-"""
-
-import json
-import csv
 import os
-import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
-import socket
+import sys
+import logging
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
+import tempfile
+import base64
+import io
+import json
+import traceback
+from datetime import datetime
 
-# Global data storage
-schemes_data = []
-server_port = int(os.environ.get("PORT", 8000))
+# Add current directory to path for imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def load_csv_data():
-    """Load CSV data without any external libraries"""
-    global schemes_data
-    csv_path = "Government_schemes_final_english.csv"
-    
-    if not os.path.exists(csv_path):
-        print(f"❌ CSV file not found: {csv_path}")
-        schemes_data = [
-            {
-                "Name": "Sample Farmer Scheme",
-                "Department": "Agriculture Ministry", 
-                "Details": "Financial assistance for farmers to purchase equipment and seeds",
-                "Benefits": "Up to 50% subsidy on agricultural equipment",
-                "Eligibility": "Small and marginal farmers with land ownership documents"
-            },
-            {
-                "Name": "Women Empowerment Loan",
-                "Department": "Women & Child Development",
-                "Details": "Low interest loans for women entrepreneurs",
-                "Benefits": "Interest rate of 4% per annum, no collateral required",
-                "Eligibility": "Women aged 18-65 with business plan"
-            }
-        ]
-        return
+# Import your existing modules
+try:
+    from voice_assistant import EnhancedVoiceAssistant
+    from config import CONFIG, PHRASES
+    print("✅ Successfully imported voice assistant modules")
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    print("Make sure all your files are in the same directory")
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Flask app setup
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
+socketio = SocketIO(app, cors_allowed_origins="*", logger=False, engineio_logger=False)
+
+# Global assistant instance
+assistant = None
+assistant_ready = False
+
+def initialize_assistant():
+    """Initialize the voice assistant"""
+    global assistant, assistant_ready
     
     try:
-        with open(csv_path, 'r', encoding='utf-8') as file:
-            csv_reader = csv.DictReader(file)
-            schemes_data = []
-            for row in csv_reader:
-                schemes_data.append(dict(row))
-        print(f"✅ Loaded {len(schemes_data)} schemes from CSV")
+        print("🤖 Initializing Enhanced Voice Assistant...")
+        
+        # Create assistant instance
+        assistant = EnhancedVoiceAssistant()
+        
+        # Set default language
+        assistant.current_language = "english"
+        assistant.user_name = "User"
+        assistant.name_collected = True
+        
+        # Test the assistant components
+        if hasattr(assistant, 'scheme_db') and assistant.scheme_db:
+            total_schemes = assistant.scheme_db.get_scheme_count()
+            print(f"📊 Database loaded with {total_schemes} schemes")
+        else:
+            print("⚠️ Database not fully initialized")
+        
+        assistant_ready = True
+        print("✅ Voice Assistant initialized successfully!")
+        return True
+        
     except Exception as e:
-        print(f"❌ Error loading CSV: {e}")
-        schemes_data = []
+        print(f"❌ Assistant initialization failed: {e}")
+        traceback.print_exc()
+        assistant_ready = False
+        return False
 
-def simple_search(query, limit=5):
-    """Ultra simple text search without external libraries"""
-    if not schemes_data:
-        return []
-    
-    query_lower = query.lower().strip()
-    
-    # Handle empty query
-    if not query_lower:
-        return schemes_data[:limit]
-    
-    query_words = query_lower.split()
-    results = []
-    
-    for scheme in schemes_data:
-        score = 0
-        
-        # Create searchable text from all fields
-        searchable_fields = [
-            scheme.get('Name', ''),
-            scheme.get('Department', ''),
-            scheme.get('Details', ''),
-            scheme.get('Benefits', ''),
-            scheme.get('Eligibility', ''),
-            scheme.get('Application_Process', ''),
-            scheme.get('Document_Required', ''),
-            scheme.get('Gender', ''),
-            scheme.get('Caste', ''),
-            scheme.get('Minority', '')
-        ]
-        
-        searchable_text = ' '.join(str(field) for field in searchable_fields).lower()
-        
-        # Simple word matching
-        for word in query_words:
-            if len(word) > 2:  # Skip very short words
-                word_count = searchable_text.count(word)
-                score += word_count * len(word)
-        
-        # Bonus for name matches
-        name = str(scheme.get('Name', '')).lower()
-        if query_lower in name:
-            score += 100
-        
-        # Bonus for exact phrase matches
-        if query_lower in searchable_text:
-            score += 50
-        
-        if score > 0:
-            scheme_result = scheme.copy()
-            scheme_result['search_score'] = score
-            results.append(scheme_result)
-    
-    # Sort by score (highest first)
-    results.sort(key=lambda x: x.get('search_score', 0), reverse=True)
-    return results[:limit]
+@app.route('/')
+def index():
+    """Main page"""
+    return render_template('index.html')
 
-class SchemeRequestHandler(BaseHTTPRequestHandler):
-    """HTTP Request Handler"""
-    
-    def do_GET(self):
-        """Handle GET requests"""
-        if self.path == '/':
-            self.serve_homepage()
-        elif self.path == '/health':
-            self.serve_health()
-        elif self.path == '/stats':
-            self.serve_stats()
-        else:
-            self.send_error(404, "Page not found")
-    
-    def do_POST(self):
-        """Handle POST requests"""
-        if self.path == '/search':
-            self.handle_search()
-        else:
-            self.send_error(404, "Endpoint not found")
-    
-    def serve_homepage(self):
-        """Serve the main HTML page"""
-        total_schemes = len(schemes_data)
-        
-        html_content = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Government Schemes Assistant</title>
-    <style>
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }}
-        .container {{
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-        }}
-        .header h1 {{
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }}
-        .header p {{
-            font-size: 1.2em;
-            opacity: 0.9;
-        }}
-        .stats {{
-            background: #f8f9fa;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid #dee2e6;
-        }}
-        .stats strong {{
-            color: #495057;
-            font-size: 1.1em;
-        }}
-        .search-section {{
-            padding: 40px;
-            text-align: center;
-        }}
-        .search-box {{
-            background: #f8f9fa;
-            padding: 30px;
-            border-radius: 10px;
-            margin: 20px 0;
-        }}
-        input[type="text"] {{
-            width: 100%;
-            max-width: 600px;
-            padding: 18px 24px;
-            font-size: 16px;
-            border: 2px solid #dee2e6;
-            border-radius: 25px;
-            outline: none;
-            transition: all 0.3s ease;
-        }}
-        input[type="text"]:focus {{
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }}
-        button {{
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 18px 40px;
-            font-size: 18px;
-            border-radius: 25px;
-            cursor: pointer;
-            margin: 15px;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }}
-        button:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-        }}
-        .examples {{
-            background: #e8f5e8;
-            padding: 25px;
-            border-radius: 10px;
-            margin: 30px 0;
-        }}
-        .examples h3 {{
-            color: #28a745;
-            margin-bottom: 15px;
-            text-align: center;
-        }}
-        .example-tags {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-        }}
-        .tag {{
-            background: #667eea;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 14px;
-            font-weight: 500;
-        }}
-        .tag:hover {{
-            background: #5a67d8;
-            transform: scale(1.05);
-        }}
-        .results {{
-            padding: 0 40px 40px;
-        }}
-        .result-item {{
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 10px;
-            padding: 25px;
-            margin: 20px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: transform 0.2s ease;
-        }}
-        .result-item:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        }}
-        .result-item h3 {{
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-        }}
-        .result-item p {{
-            margin: 10px 0;
-            line-height: 1.6;
-        }}
-        .result-item strong {{
-            color: #495057;
-        }}
-        .loading {{
-            text-align: center;
-            padding: 40px;
-            color: #6c757d;
-            font-size: 1.2em;
-        }}
-        .error {{
-            background: #f8d7da;
-            color: #721c24;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: center;
-        }}
-        .no-results {{
-            background: #fff3cd;
-            color: #856404;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: center;
-        }}
-        @media (max-width: 768px) {{
-            .container {{ margin: 0; border-radius: 0; }}
-            .header {{ padding: 30px 20px; }}
-            .header h1 {{ font-size: 2em; }}
-            .search-section {{ padding: 20px; }}
-            .results {{ padding: 0 20px 20px; }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🏛️ Government Schemes Assistant</h1>
-            <p>Find government schemes in Hindi, English, or Hinglish!</p>
-        </div>
-        
-        <div class="stats">
-            <strong>📊 Database Status: {total_schemes} government schemes loaded and ready!</strong>
-        </div>
-        
-        <div class="search-section">
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Type your question here (e.g., farmer scheme, women loan, मछुआरा योजना)" />
-                <br>
-                <button onclick="searchSchemes()">🔍 Search Schemes</button>
-            </div>
-            
-            <div class="examples">
-                <h3>🎯 Try These Examples:</h3>
-                <div class="example-tags">
-                    <span class="tag" onclick="searchExample('farmer scheme')">👨‍🌾 Farmer Scheme</span>
-                    <span class="tag" onclick="searchExample('महिला योजना')">👩 Women Schemes</span>
-                    <span class="tag" onclick="searchExample('fisherman subsidy')">🎣 Fisherman</span>
-                    <span class="tag" onclick="searchExample('business loan')">💼 Business Loan</span>
-                    <span class="tag" onclick="searchExample('education scholarship')">🎓 Education</span>
-                    <span class="tag" onclick="searchExample('rural development')">🏘️ Rural Development</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="results" id="results"></div>
-    </div>
+@app.route('/health')
+def health():
+    """Health check endpoint for Railway"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "assistant_ready": assistant_ready,
+        "assistant_available": assistant is not None
+    }
 
-    <script>
-        async function searchSchemes() {{
-            const input = document.getElementById('searchInput');
-            const query = input.value.trim();
-            const resultsDiv = document.getElementById('results');
-            
-            if (!query) {{
-                alert('Please enter a search query! 📝');
-                return;
-            }}
-            
-            resultsDiv.innerHTML = '<div class="loading">🔍 Searching through {total_schemes} government schemes...</div>';
-            
-            try {{
-                const response = await fetch('/search', {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ query: query }})
-                }});
-                
-                const data = await response.json();
-                
-                if (data.schemes && data.schemes.length > 0) {{
-                    let html = `<h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📋 Found ${{data.schemes.length}} Relevant Schemes for "${{query}}"</h2>`;
-                    
-                    data.schemes.forEach((scheme, index) => {{
-                        const name = scheme.Name || 'Government Scheme';
-                        const dept = scheme.Department || 'N/A';
-                        const details = scheme.Details || 'Details not available';
-                        const benefits = scheme.Benefits || 'Benefits information not available';
-                        const eligibility = scheme.Eligibility || 'Eligibility criteria not specified';
-                        
-                        html += `
-                            <div class="result-item">
-                                <h3>${{index + 1}}. ${{name}}</h3>
-                                <p><strong>🏛️ Department:</strong> ${{dept}}</p>
-                                <p><strong>📝 Details:</strong> ${{details.substring(0, 300)}}${{details.length > 300 ? '...' : ''}}</p>
-                                <p><strong>💰 Benefits:</strong> ${{benefits.substring(0, 200)}}${{benefits.length > 200 ? '...' : ''}}</p>
-                                <p><strong>✅ Eligibility:</strong> ${{eligibility.substring(0, 200)}}${{eligibility.length > 200 ? '...' : ''}}</p>
-                            </div>
-                        `;
-                    }});
-                    
-                    resultsDiv.innerHTML = html;
-                }} else {{
-                    resultsDiv.innerHTML = `
-                        <div class="no-results">
-                            ❌ No schemes found for "${{query}}". 
-                            <br><br>
-                            <strong>Try keywords like:</strong> farmer, women, fisherman, loan, subsidy, education, rural, business, agriculture
-                        </div>
-                    `;
-                }}
-                
-            }} catch (error) {{
-                resultsDiv.innerHTML = '<div class="error">❌ Error occurred. Please try again.</div>';
-                console.error('Search error:', error);
-            }}
-        }}
-        
-        function searchExample(query) {{
-            document.getElementById('searchInput').value = query;
-            searchSchemes();
-        }}
-        
-        document.getElementById('searchInput').addEventListener('keypress', function(e) {{
-            if (e.key === 'Enter') {{
-                searchSchemes();
-            }}
-        }});
-        
-        // Load some sample results on page load
-        window.onload = function() {{
-            searchExample('farmer');
-        }};
-    </script>
-</body>
-</html>'''
-        
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/html; charset=utf-8')
-        self.end_headers()
-        self.wfile.write(html_content.encode('utf-8'))
-    
-    def handle_search(self):
-        """Handle search requests"""
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
-            query = request_data.get('query', '').strip()
-            
-            if not query:
-                response = {"schemes": [], "message": "Please provide a search query"}
-            else:
-                schemes = simple_search(query, limit=5)
-                response = {
-                    "schemes": schemes,
-                    "query": query,
-                    "count": len(schemes)
-                }
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
-            
-        except Exception as e:
-            error_response = {"schemes": [], "message": f"Search failed: {str(e)}"}
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(error_response).encode('utf-8'))
-    
-    def serve_health(self):
-        """Health check endpoint"""
-        response = {
-            "status": "OK",
-            "message": "Government Schemes Assistant is running!",
-            "total_schemes": len(schemes_data)
-        }
-        
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode('utf-8'))
-    
-    def serve_stats(self):
-        """Stats endpoint"""
-        response = {
-            "total_schemes": len(schemes_data),
-            "status": "active",
-            "search_ready": len(schemes_data) > 0
-        }
-        
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode('utf-8'))
-    
-    def log_message(self, format, *args):
-        """Override to reduce logging noise"""
-        return
+@app.route('/test')
+def test():
+    """Test endpoint"""
+    return {
+        "message": "Voice Assistant API is running!",
+        "assistant_status": "Ready" if assistant_ready else "Not Ready"
+    }
 
-def run_server():
-    """Run the HTTP server"""
-    print("🚀 Starting Government Schemes Assistant...")
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    print(f'🔗 Client connected: {request.sid}')
     
-    # Load CSV data
-    load_csv_data()
+    # Send welcome message
+    emit('status', {
+        'type': 'connection',
+        'message': 'Connected to Government Schemes Voice Assistant!',
+        'assistant_ready': assistant_ready
+    })
     
-    # Start server
-    server = HTTPServer(('0.0.0.0', server_port), SchemeRequestHandler)
-    print(f"✅ Server running on port {server_port}")
-    print(f"📊 Loaded {len(schemes_data)} schemes")
-    print(f"🌐 Access at: http://localhost:{server_port}")
+    # Send welcome message from assistant
+    if assistant_ready:
+        welcome_msg = "Namaste! Main aapki government schemes mein madad kar sakta hun। Aap Hindi, English ya Hinglish mein baat kar sakte hain।"
+        emit('bot_response', {
+            'text': welcome_msg,
+            'type': 'welcome',
+            'timestamp': datetime.now().isoformat()
+        })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    print(f'❌ Client disconnected: {request.sid}')
+
+@socketio.on('set_language')
+def handle_language_change(data):
+    """Handle language change"""
+    global assistant
     
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\\n🛑 Server stopping...")
-        server.server_close()
+        language = data.get('language', 'english')
+        
+        if assistant and assistant_ready:
+            assistant.current_language = language
+            
+            # Send confirmation in selected language
+            confirmations = {
+                'hindi': 'आपकी भाषा हिंदी में बदल गई है।',
+                'english': 'Language changed to English.',
+                'hinglish': 'Language Hinglish mein change ho gayi hai।'
+            }
+            
+            emit('bot_response', {
+                'text': confirmations.get(language, confirmations['english']),
+                'type': 'language_change'
+            })
+            
+            print(f"🌐 Language changed to: {language}")
+        
+    except Exception as e:
+        print(f"Error changing language: {e}")
+        emit('error', {'message': f'Language change error: {str(e)}'})
 
-if __name__ == "__main__":
-    run_server()
+@socketio.on('set_user_context')
+def handle_user_context(data):
+    """Handle user context (name, occupation, location)"""
+    global assistant
+    
+    try:
+        if assistant and assistant_ready:
+            name = data.get('name', 'User')
+            occupation = data.get('occupation', '')
+            location = data.get('location', '')
+            
+            # Update assistant context
+            assistant.user_name = name
+            assistant.user_context.update({
+                'name': name,
+                'occupation': occupation if occupation else None,
+                'location': location if location else None
+            })
+            
+            # Parse occupation and location if provided as text
+            if occupation:
+                parsed_occ, parsed_loc = assistant.parse_user_occupation(occupation)
+                if parsed_occ:
+                    assistant.user_context['occupation'] = parsed_occ
+                if parsed_loc and not location:
+                    assistant.user_context['location'] = parsed_loc
+            
+            response_parts = [f"Dhanyawad {name}!"]
+            
+            if assistant.user_context.get('occupation'):
+                response_parts.append(f"Aap {assistant.user_context['occupation']} hain।")
+            
+            if assistant.user_context.get('location'):
+                response_parts.append(f"Location: {assistant.user_context['location']}।")
+            
+            response_parts.append("Main aapko relevant schemes suggest kar sakta hun।")
+            
+            emit('bot_response', {
+                'text': ' '.join(response_parts),
+                'type': 'context_update'
+            })
+            
+            print(f"👤 User context updated: {assistant.user_context}")
+        
+    except Exception as e:
+        print(f"Error updating user context: {e}")
+        emit('error', {'message': f'Context update error: {str(e)}'})
+
+@socketio.on('text_message')
+def handle_text_message(data):
+    """Handle text message from user"""
+    global assistant
+    
+    if not assistant_ready or not assistant:
+        emit('error', {'message': 'Assistant not ready. Please refresh the page.'})
+        return
+    
+    try:
+        query = data.get('message', '').strip()
+        language = data.get('language', assistant.current_language if assistant else 'english')
+        
+        if not query:
+            emit('error', {'message': 'Empty message received'})
+            return
+        
+        print(f"🗣️ Processing query: '{query}' (Language: {language})")
+        
+        # Update assistant language
+        assistant.current_language = language
+        
+        # Handle special commands
+        if query.lower() in ['exit', 'quit', 'bye', 'band karo', 'khatam']:
+            goodbye_messages = {
+                'hindi': 'धन्यवाद! आपका दिन शुभ हो!',
+                'english': 'Thank you! Have a great day!',
+                'hinglish': 'Thank you! Aapka din shubh ho!'
+            }
+            
+            emit('bot_response', {
+                'text': goodbye_messages.get(language, goodbye_messages['english']),
+                'type': 'goodbye'
+            })
+            return
+        
+        # Use your existing scheme search logic
+        print(f"🔍 Searching schemes for: {query}")
+        
+        # Get user context
+        occupation = assistant.user_context.get('occupation')
+        location = assistant.user_context.get('location')
+        
+        print(f"👤 User context - Occupation: {occupation}, Location: {location}")
+        
+        # Find relevant schemes using your existing logic
+        relevant_schemes = assistant.find_relevant_schemes(query, top_n=5)
+        
+        if relevant_schemes:
+            print(f"✅ Found {len(relevant_schemes)} relevant schemes")
+            
+            # Log found schemes
+            for i, scheme in enumerate(relevant_schemes[:3], 1):
+                scheme_name = scheme.get('Name', 'Unknown')[:50]
+                print(f"  {i}. {scheme_name}...")
+            
+            # Format response using your existing logic
+            response = assistant.format_scheme_response(relevant_schemes, query, language)
+            
+            # Also send structured scheme data
+            schemes_data = []
+            for scheme in relevant_schemes[:3]:  # Top 3 schemes
+                schemes_data.append({
+                    'name': scheme.get('Name', 'Unknown'),
+                    'department': scheme.get('Department', 'N/A'),
+                    'benefits': scheme.get('Benefits', 'N/A')[:200],
+                    'eligibility': scheme.get('Eligibility', 'N/A')[:200],
+                    'score': scheme.get('Score', 0)
+                })
+            
+            emit('bot_response', {
+                'text': response,
+                'type': 'scheme_response',
+                'schemes': schemes_data,
+                'query': query,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        else:
+            print("❌ No schemes found")
+            
+            # No schemes found response
+            no_scheme_messages = {
+                'hindi': f"'{query}' के लिए कोई योजना नहीं मिली। कृपया अधिक विवरण दें या अलग तरीके से पूछें।",
+                'english': f"No schemes found for '{query}'. Please provide more details or try asking differently.",
+                'hinglish': f"'{query}' ke liye koi scheme nahi mili। Please aur details dijiye ya different way mein puchiye।"
+            }
+            
+            emit('bot_response', {
+                'text': no_scheme_messages.get(language, no_scheme_messages['english']),
+                'type': 'no_results',
+                'query': query
+            })
+    
+    except Exception as e:
+        error_msg = f"Processing error: {str(e)}"
+        print(f"❌ Error processing message: {e}")
+        traceback.print_exc()
+        
+        emit('error', {
+            'message': error_msg,
+            'type': 'processing_error'
+        })
+
+@socketio.on('get_assistant_status')
+def handle_status_request():
+    """Get assistant status"""
+    status = {
+        'ready': assistant_ready,
+        'available': assistant is not None,
+        'language': assistant.current_language if assistant else 'english',
+        'user_context': assistant.user_context if assistant else {}
+    }
+    
+    emit('assistant_status', status)
+
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Page not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
+
+@socketio.on_error_default
+def default_error_handler(e):
+    print(f"SocketIO Error: {e}")
+    emit('error', {'message': 'Connection error occurred'})
+
+if __name__ == '__main__':
+    print("🚀 Starting Government Schemes Voice Assistant Server...")
+    
+    # Initialize assistant
+    init_success = initialize_assistant()
+    
+    if not init_success:
+        print("⚠️ Assistant initialization failed, but server will still run")
+    
+    # Get port from environment (Railway sets this automatically)
+    port = int(os.environ.get('PORT', 5000))
+    
+    print(f"🌐 Server starting on port {port}")
+    print(f"🤖 Assistant ready: {assistant_ready}")
+    
+    # Run the app
+    socketio.run(
+        app, 
+        host='0.0.0.0', 
+        port=port, 
+        debug=False,  # Set to False for production
+        allow_unsafe_werkzeug=True
+    )
