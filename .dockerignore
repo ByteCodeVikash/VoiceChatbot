@@ -1,8 +1,0 @@
-# .dockerignore file banao
-.nixpacks/
-nixpacks.toml
-.git/
-.gitignore
-__pycache__/
-*.pyc
-.env
