@@ -1,12 +1,26 @@
-# nixpacks.toml
 [phases.setup]
-nixPkgs = ["python312", "python312Packages.pip", "nodejs", "gcc"]
+nixPkgs = [
+    "python311",
+    "python311Packages.pip",
+    "python311Packages.setuptools",
+    "python311Packages.wheel",
+    "gcc",
+    "pkg-config"
+]
 
 [phases.install]
-cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
+cmds = [
+    "python -m venv venv",
+    "source venv/bin/activate",
+    "pip install --upgrade pip",
+    "pip install -r requirements.txt"
+]
 
 [phases.build]
-cmds = ["echo 'Build phase'"]
+cmds = ["echo 'Build complete'"]
 
 [start]
-cmd = "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app"
+cmd = "source venv/bin/activate && python app.py"
+
+[start]
+cmd = "chmod +x startup.sh && ./startup.sh"
