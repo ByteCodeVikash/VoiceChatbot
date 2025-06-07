@@ -308,4 +308,4 @@ if __name__ == "__main__":
     print(f"🌐 Environment: {'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'}")
     
     bot = TelegramSchemeBot(BOT_TOKEN)
-    bot.run()
+    bot.run()# Railway deployment - Saturday 07 June 2025 10:24:55 AM IST
