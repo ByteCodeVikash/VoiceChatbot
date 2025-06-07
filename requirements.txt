@@ -1,2 +1,11 @@
 Flask==2.3.3
 gunicorn==21.2.0
+uvicorn==0.24.0
+Flask==2.3.3
+Flask-SocketIO==5.3.6
+gunicorn==21.2.0
+eventlet==0.33.3
+gtts==2.4.0
+requests==2.31.0
+pandas==1.5.3
+python-dotenv==1.0.0
