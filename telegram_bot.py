@@ -303,7 +303,9 @@ if __name__ == "__main__":
         print("Use: export BOT_TOKEN='your_token_here'")
         exit(1)
     
-    print(f"🤖 Starting bot with token: {BOT_TOKEN[:10]}...")
+    print(f"🤖 Starting Telegram Scheme Bot...")
+    print(f"🔑 Token configured: {BOT_TOKEN[:10]}...")
+    print(f"🌐 Environment: {'Railway' if os.getenv('RAILWAY_ENVIRONMENT') else 'Local'}")
     
     bot = TelegramSchemeBot(BOT_TOKEN)
     bot.run()
