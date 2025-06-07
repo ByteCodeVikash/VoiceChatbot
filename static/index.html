@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Government Schemes Assistant</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>🤖 Real-time Voice Assistant - Government Schemes</title>
     <style>
         * {
             margin: 0;
@@ -13,650 +12,678 @@
         }
 
         body {
-            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
             color: #333;
         }
 
         .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
         }
 
         .header {
             text-align: center;
             margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .header h1 {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: 400;
+            color: #4a5568;
             margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
+            font-size: 2.5em;
         }
 
         .header p {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1.1rem;
-            font-weight: 300;
+            color: #718096;
+            font-size: 1.1em;
         }
 
-        .chat-container {
-            flex: 1;
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        .status-panel {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 5px solid #4299e1;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .connection-status {
+            font-size: 0.9em;
+            color: #718096;
+        }
+
+        .controls {
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            min-height: 600px;
-        }
-
-        .messages-area {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
-            background: #fafafa;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .message {
-            display: flex;
             gap: 15px;
-            max-width: 85%;
-            animation: slideIn 0.3s ease-out;
+            margin-bottom: 20px;
         }
 
-        .message.user {
-            align-self: flex-end;
-            flex-direction: row-reverse;
-        }
-
-        .message.assistant {
-            align-self: flex-start;
-        }
-
-        .message-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+        .voice-controls {
             display: flex;
-            align-items: center;
+            gap: 10px;
             justify-content: center;
-            flex-shrink: 0;
-            font-size: 1.2rem;
-            color: white;
-        }
-
-        .message.user .message-avatar {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-        }
-
-        .message.assistant .message-avatar {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
-        }
-
-        .message-content {
-            background: white;
-            padding: 16px 20px;
-            border-radius: 18px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e8eaed;
-            position: relative;
-            line-height: 1.5;
-        }
-
-        .message.user .message-content {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-        }
-
-        .input-area {
-            padding: 24px;
-            background: white;
-            border-top: 1px solid #e8eaed;
-        }
-
-        .input-container {
-            display: flex;
-            gap: 12px;
-            align-items: flex-end;
-            background: #f8f9fa;
-            border-radius: 24px;
-            padding: 8px;
-            border: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .input-container:focus-within {
-            border-color: #667eea;
-            background: white;
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
-        }
-
-        .text-input {
-            flex: 1;
-            border: none;
-            outline: none;
-            background: transparent;
-            padding: 12px 16px;
-            font-size: 16px;
-            resize: none;
-            max-height: 120px;
-            min-height: 20px;
-            font-family: inherit;
-        }
-
-        .input-buttons {
-            display: flex;
-            gap: 8px;
-            align-items: center;
+            flex-wrap: wrap;
         }
 
         .btn {
+            padding: 15px 25px;
             border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: bold;
             cursor: pointer;
-            border-radius: 50%;
-            width: 44px;
-            height: 44px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #4299e1, #3182ce);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #f56565, #e53e3e);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #48bb78, #38a169);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .text-input-area {
+            margin-bottom: 20px;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            font-size: 1.1em;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .text-input:focus {
+            border-color: #4299e1;
+        }
+
+        .chat-area {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background: #e3f2fd;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.bot {
+            background: #f3e5f5;
+            margin-right: auto;
+        }
+
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #718096;
+            margin-top: 5px;
+        }
+
+        .voice-visualizer {
+            height: 60px;
+            background: #f7fafc;
+            border-radius: 10px;
+            margin: 15px 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
-            font-size: 1.1rem;
+            position: relative;
+            overflow: hidden;
         }
 
-        .voice-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
+        .wave {
+            width: 4px;
+            background: #4299e1;
+            margin: 0 1px;
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
         }
 
-        .voice-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        @keyframes wave {
+            0%, 100% { height: 10px; }
+            50% { height: 40px; }
         }
 
-        .voice-btn.recording {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-            animation: pulse 2s infinite;
+        .wave:nth-child(2) { animation-delay: 0.1s; }
+        .wave:nth-child(3) { animation-delay: 0.2s; }
+        .wave:nth-child(4) { animation-delay: 0.3s; }
+        .wave:nth-child(5) { animation-delay: 0.4s; }
+
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
         }
 
-        .send-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-        }
-
-        .send-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-        }
-
-        .send-btn:disabled {
-            background: #e0e0e0;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .status-indicator {
-            padding: 12px 20px;
-            background: rgba(102, 126, 234, 0.1);
-            border-radius: 12px;
-            margin-bottom: 16px;
-            text-align: center;
-            font-size: 14px;
-            color: #667eea;
-            border: 1px solid rgba(102, 126, 234, 0.2);
-        }
-
-        .status-indicator.listening {
-            background: rgba(255, 193, 7, 0.1);
-            color: #856404;
-            border-color: rgba(255, 193, 7, 0.3);
-        }
-
-        .status-indicator.processing {
-            background: rgba(108, 117, 125, 0.1);
-            color: #495057;
-            border-color: rgba(108, 117, 125, 0.3);
-        }
-
-        .welcome-message {
-            text-align: center;
-            padding: 40px 20px;
-            color: #666;
-        }
-
-        .welcome-message h3 {
-            color: #333;
-            margin-bottom: 12px;
-            font-weight: 500;
-        }
-
-        .welcome-message p {
-            margin-bottom: 8px;
-            font-size: 15px;
-        }
-
-        .typing-indicator {
-            display: flex;
-            gap: 6px;
-            padding: 16px 20px;
-            align-items: center;
-        }
-
-        .typing-dot {
-            width: 8px;
-            height: 8px;
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4299e1;
             border-radius: 50%;
-            background: #667eea;
-            animation: typing 1.4s infinite ease-in-out;
+            animation: spin 1s linear infinite;
         }
 
-        .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .language-selector {
             display: flex;
-            gap: 8px;
-            justify-content: center;
+            gap: 10px;
             margin-bottom: 20px;
+            justify-content: center;
         }
 
         .lang-btn {
-            padding: 8px 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border-radius: 20px;
+            padding: 10px 20px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-size: 14px;
         }
 
-        .lang-btn.active,
-        .lang-btn:hover {
-            background: white;
-            color: #667eea;
+        .lang-btn.active {
+            background: #4299e1;
+            color: white;
+            border-color: #4299e1;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
-                opacity: 0.4;
-            }
-            30% {
-                transform: translateY(-10px);
-                opacity: 1;
-            }
-        }
-
-        @media (max-width: 768px) {
+        @media (max-width: 600px) {
             .container {
-                padding: 10px;
+                padding: 20px;
+                margin: 10px;
             }
             
             .header h1 {
-                font-size: 2rem;
+                font-size: 2em;
             }
             
-            .messages-area {
-                padding: 20px;
+            .voice-controls {
+                flex-direction: column;
             }
             
-            .message {
-                max-width: 95%;
+            .btn {
+                font-size: 1em;
+                padding: 12px 20px;
             }
-        }
-
-        .scheme-card {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin: 8px 0;
-            border-left: 4px solid #667eea;
-        }
-
-        .scheme-title {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .scheme-details {
-            color: #666;
-            font-size: 14px;
-            line-height: 1.4;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>
-                <i class="fas fa-robot"></i>
-                Government Schemes Assistant
-            </h1>
-            <p>Ask about government schemes in Hindi, English, or Hinglish</p>
-            <div class="language-selector">
-                <button class="lang-btn active" data-lang="english">English</button>
-                <button class="lang-btn" data-lang="hindi">हिंदी</button>
-                <button class="lang-btn" data-lang="hinglish">Hinglish</button>
+            <h1>🤖 सरकारी योजना सहायक</h1>
+            <p>Real-time Voice Assistant for Government Schemes</p>
+        </div>
+
+        <div class="status-panel">
+            <div class="status" id="status">🔄 Connecting...</div>
+            <div class="connection-status" id="connectionStatus">Establishing connection to voice server...</div>
+        </div>
+
+        <div class="language-selector">
+            <div class="lang-btn" onclick="selectLanguage('hindi')">🇮🇳 हिंदी</div>
+            <div class="lang-btn" onclick="selectLanguage('english')">🇬🇧 English</div>
+            <div class="lang-btn" onclick="selectLanguage('hinglish')">🌍 Hinglish</div>
+        </div>
+
+        <div class="controls">
+            <div class="voice-controls">
+                <button class="btn btn-primary" id="startBtn" onclick="startVoiceChat()">
+                    🎤 Start Voice Chat
+                </button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopVoiceChat()" disabled>
+                    ⏹️ Stop
+                </button>
+                <button class="btn btn-success" id="playLastBtn" onclick="playLastResponse()" disabled>
+                    🔊 Replay
+                </button>
+            </div>
+
+            <div class="voice-visualizer" id="visualizer" style="display: none;">
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
             </div>
         </div>
 
-        <div class="chat-container">
-            <div class="messages-area" id="messagesArea">
-                <div class="welcome-message">
-                    <h3>👋 Welcome to Government Schemes Assistant!</h3>
-                    <p>I can help you find relevant government schemes and benefits.</p>
-                    <p>Try asking:</p>
-                    <p>"What schemes are available for farmers?"</p>
-                    <p>"मुझे महिलाओं के लिए योजना चाहिए"</p>
-                    <p>"Kya business loan ki koi scheme hai?"</p>
-                </div>
-            </div>
+        <div class="text-input-area">
+            <input type="text" class="text-input" id="textInput" placeholder="या यहाँ टाइप करें / Or type here..." onkeypress="handleKeyPress(event)">
+            <button class="btn btn-primary" onclick="sendTextMessage()" style="width: 100%; margin-top: 10px;">
+                📝 Send Text Message
+            </button>
+        </div>
 
-            <div class="status-indicator" id="statusIndicator">
-                Ready to help you find government schemes
-            </div>
-
-            <div class="input-area">
-                <div class="input-container">
-                    <textarea 
-                        id="textInput" 
-                        class="text-input" 
-                        placeholder="Ask about government schemes..."
-                        rows="1"
-                    ></textarea>
-                    <div class="input-buttons">
-                        <button id="voiceBtn" class="btn voice-btn" title="Voice input">
-                            <i class="fas fa-microphone"></i>
-                        </button>
-                        <button id="sendBtn" class="btn send-btn" title="Send message">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
+        <div class="chat-area" id="chatArea">
+            <div class="message bot">
+                <div>Welcome! I'm your Government Schemes Assistant. Please select your language above and start speaking! 🙏</div>
+                <div class="timestamp">Ready to help</div>
             </div>
         </div>
+
+        <div id="errorArea"></div>
     </div>
 
     <script>
-        class GovernmentSchemesChat {
-            constructor() {
-                this.socket = null;
-                this.isRecording = false;
-                this.mediaRecorder = null;
-                this.currentLanguage = 'english';
-                this.isConnected = false;
-                
-                this.initializeElements();
-                this.setupEventListeners();
-                this.connectWebSocket();
-            }
-
-            initializeElements() {
-                this.messagesArea = document.getElementById('messagesArea');
-                this.textInput = document.getElementById('textInput');
-                this.voiceBtn = document.getElementById('voiceBtn');
-                this.sendBtn = document.getElementById('sendBtn');
-                this.statusIndicator = document.getElementById('statusIndicator');
-                this.langButtons = document.querySelectorAll('.lang-btn');
-            }
-
-            setupEventListeners() {
-                // Send button
-                this.sendBtn.addEventListener('click', () => this.sendMessage());
-                
-                // Enter key to send
-                this.textInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        this.sendMessage();
+        // Global variables
+        let websocket = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let currentLanguage = 'english';
+        let lastAudioResponse = null;
+        
+        // WebSocket connection
+        function initWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function(event) {
+                updateStatus('🟢 Connected', 'Ready for voice conversation!');
+                clearError();
+            };
+            
+            websocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleServerMessage(data);
+            };
+            
+            websocket.onclose = function(event) {
+                updateStatus('🔴 Disconnected', 'Connection lost. Reconnecting...');
+                setTimeout(initWebSocket, 3000);
+            };
+            
+            websocket.onerror = function(error) {
+                showError('WebSocket connection error. Please refresh the page.');
+                updateStatus('❌ Error', 'Connection failed');
+            };
+        }
+        
+        // Handle messages from server
+        function handleServerMessage(data) {
+            switch(data.type) {
+                case 'welcome':
+                case 'response':
+                    addMessage('bot', data.text);
+                    if (data.audio) {
+                        playAudio(data.audio);
+                        lastAudioResponse = data.audio;
+                        document.getElementById('playLastBtn').disabled = false;
                     }
-                });
-
-                // Auto-resize textarea
-                this.textInput.addEventListener('input', () => {
-                    this.textInput.style.height = 'auto';
-                    this.textInput.style.height = (this.textInput.scrollHeight) + 'px';
-                });
-
-                // Voice button
-                this.voiceBtn.addEventListener('click', () => this.toggleVoiceInput());
-
-                // Language selection
-                this.langButtons.forEach(btn => {
-                    btn.addEventListener('click', () => this.selectLanguage(btn.dataset.lang));
-                });
-            }
-
-            connectWebSocket() {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/ws`;
-                
-                this.socket = new WebSocket(wsUrl);
-                
-                this.socket.onopen = () => {
-                    console.log('Connected to assistant');
-                    this.isConnected = true;
-                    this.updateStatus('Connected - Ready to help!', 'ready');
-                    this.clearWelcomeMessage();
-                };
-                
-                this.socket.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'response') {
-                        this.addMessage(data.message, 'assistant');
-                        this.speakResponse(data.message);
-                        this.updateStatus('Ready for your next question', 'ready');
+                    if (data.user_input) {
+                        addMessage('user', data.user_input);
                     }
-                };
-                
-                this.socket.onclose = () => {
-                    console.log('Disconnected from assistant');
-                    this.isConnected = false;
-                    this.updateStatus('Disconnected - Refresh to reconnect', 'error');
-                };
-
-                this.socket.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    this.updateStatus('Connection error - Please refresh', 'error');
-                };
-            }
-
-            sendMessage() {
-                const message = this.textInput.value.trim();
-                if (!message || !this.isConnected) return;
-
-                this.addMessage(message, 'user');
-                this.textInput.value = '';
-                this.textInput.style.height = 'auto';
-                this.updateStatus('Processing your question...', 'processing');
-
-                this.socket.send(JSON.stringify({
-                    type: 'text',
-                    message: message,
-                    language: this.currentLanguage
-                }));
-            }
-
-            addMessage(text, sender) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${sender}`;
-                
-                const avatar = document.createElement('div');
-                avatar.className = 'message-avatar';
-                avatar.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
-                
-                const content = document.createElement('div');
-                content.className = 'message-content';
-                
-                if (sender === 'assistant' && text.includes('scheme')) {
-                    content.innerHTML = this.formatSchemeResponse(text);
-                } else {
-                    content.textContent = text;
-                }
-                
-                messageDiv.appendChild(avatar);
-                messageDiv.appendChild(content);
-                
-                this.messagesArea.appendChild(messageDiv);
-                this.scrollToBottom();
-            }
-
-            formatSchemeResponse(text) {
-                // Simple formatting for scheme information
-                if (text.includes(':')) {
-                    return text.replace(/([^:]+):/g, '<div class="scheme-title">$1:</div><div class="scheme-details">') + '</div>';
-                }
-                return text;
-            }
-
-            async toggleVoiceInput() {
-                if (!this.isRecording) {
-                    await this.startVoiceInput();
-                } else {
-                    this.stopVoiceInput();
-                }
-            }
-
-            async startVoiceInput() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    this.mediaRecorder = new MediaRecorder(stream);
+                    break;
                     
-                    let audioChunks = [];
+                case 'error':
+                    showError(data.message);
+                    break;
                     
-                    this.mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-                    
-                    this.mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        // For now, we'll show a message that voice is being processed
-                        this.addMessage('Voice message received', 'user');
-                        this.addMessage('Voice processing will be implemented soon. Please use text input for now.', 'assistant');
-                    };
-                    
-                    this.mediaRecorder.start();
-                    this.isRecording = true;
-                    
-                    this.voiceBtn.classList.add('recording');
-                    this.voiceBtn.innerHTML = '<i class="fas fa-stop"></i>';
-                    this.updateStatus('Listening... Speak now!', 'listening');
-                    
-                } catch (error) {
-                    console.error('Microphone access denied:', error);
-                    alert('Please allow microphone access to use voice input.');
-                }
-            }
-
-            stopVoiceInput() {
-                if (this.mediaRecorder && this.isRecording) {
-                    this.mediaRecorder.stop();
-                    this.isRecording = false;
-                    
-                    this.voiceBtn.classList.remove('recording');
-                    this.voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-                    this.updateStatus('Processing voice input...', 'processing');
-                }
-            }
-
-            selectLanguage(lang) {
-                this.currentLanguage = lang;
-                this.langButtons.forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.lang === lang);
-                });
-                
-                // Update placeholder text based on language
-                const placeholders = {
-                    english: 'Ask about government schemes...',
-                    hindi: 'सरकारी योजनाओं के बारे में पूछें...',
-                    hinglish: 'Government schemes ke baare mein puchiye...'
-                };
-                
-                this.textInput.placeholder = placeholders[lang] || placeholders.english;
-            }
-
-            updateStatus(message, type) {
-                this.statusIndicator.textContent = message;
-                this.statusIndicator.className = `status-indicator ${type}`;
-            }
-
-            speakResponse(text) {
-                if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.rate = 0.8;
-                    utterance.pitch = 1;
-                    
-                    // Set language based on current selection
-                    const langCodes = {
-                        english: 'en-US',
-                        hindi: 'hi-IN',
-                        hinglish: 'hi-IN'
-                    };
-                    
-                    utterance.lang = langCodes[this.currentLanguage] || 'en-US';
-                    speechSynthesis.speak(utterance);
-                }
-            }
-
-            clearWelcomeMessage() {
-                const welcomeMsg = this.messagesArea.querySelector('.welcome-message');
-                if (welcomeMsg) {
-                    welcomeMsg.style.display = 'none';
-                }
-            }
-
-            scrollToBottom() {
-                this.messagesArea.scrollTop = this.messagesArea.scrollHeight;
+                case 'pong':
+                    // Keep-alive response
+                    break;
             }
         }
-
-        // Initialize the chat when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            new GovernmentSchemesChat();
+        
+        // Language selection
+        function selectLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Update UI
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Send language selection to server
+            sendTextMessage(lang);
+            
+            updateStatus(`🌐 Language: ${lang.charAt(0).toUpperCase() + lang.slice(1)}`, 'Language selected');
+        }
+        
+        // Voice recording functions
+        async function startVoiceChat() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 44100,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = function() {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    sendAudioToServer(audioBlob);
+                    hideVisualizer();
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // Update UI
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                showVisualizer();
+                updateStatus('🎤 Recording...', 'Speak now! Click stop when finished.');
+                
+                // Auto-stop after 10 seconds (optional)
+                setTimeout(() => {
+                    if (isRecording) {
+                        stopVoiceChat();
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                showError('Microphone access denied. Please allow microphone access and try again.');
+                console.error('Error accessing microphone:', error);
+            }
+        }
+        
+        function stopVoiceChat() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // Stop all audio tracks
+                if (mediaRecorder.stream) {
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // Update UI
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                updateStatus('⏳ Processing...', 'Converting speech to text...');
+            }
+        }
+        
+        // Send audio to server
+        async function sendAudioToServer(audioBlob) {
+            try {
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                
+                const message = {
+                    type: 'audio',
+                    data: base64Audio
+                };
+                
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify(message));
+                } else {
+                    showError('Connection lost. Please refresh the page.');
+                }
+            } catch (error) {
+                showError('Error processing audio. Please try again.');
+                console.error('Audio processing error:', error);
+            }
+        }
+        
+        // Text input functions
+        function sendTextMessage(text = null) {
+            const textInput = document.getElementById('textInput');
+            const message = text || textInput.value.trim();
+            
+            if (!message) {
+                showError('Please enter a message');
+                return;
+            }
+            
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({
+                    type: 'text',
+                    text: message
+                }));
+                
+                if (!text) {
+                    addMessage('user', message);
+                    textInput.value = '';
+                }
+                
+                updateStatus('⏳ Processing...', 'Getting response...');
+            } else {
+                showError('Not connected to server. Please refresh the page.');
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendTextMessage();
+            }
+        }
+        
+        // Audio playback
+        function playAudio(base64Audio) {
+            try {
+                const audioData = 'data:audio/mp3;base64,' + base64Audio;
+                const audio = new Audio(audioData);
+                
+                audio.play().catch(error => {
+                    console.error('Audio playback failed:', error);
+                    showError('Audio playback failed. Please check browser settings.');
+                });
+                
+                updateStatus('🔊 Playing response...', 'Audio is playing');
+                
+                audio.onended = function() {
+                    updateStatus('✅ Ready', 'Ready for next input');
+                };
+                
+            } catch (error) {
+                console.error('Audio creation failed:', error);
+                showError('Failed to play audio response.');
+            }
+        }
+        
+        function playLastResponse() {
+            if (lastAudioResponse) {
+                playAudio(lastAudioResponse);
+            } else {
+                showError('No audio response to replay.');
+            }
+        }
+        
+        // UI helper functions
+        function addMessage(sender, text) {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <div>${text}</div>
+                <div class="timestamp">${timestamp}</div>
+            `;
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        
+        function updateStatus(status, description) {
+            document.getElementById('status').textContent = status;
+            document.getElementById('connectionStatus').textContent = description;
+        }
+        
+        function showError(message) {
+            const errorArea = document.getElementById('errorArea');
+            errorArea.innerHTML = `<div class="error">❌ ${message}</div>`;
+            setTimeout(() => {
+                errorArea.innerHTML = '';
+            }, 5000);
+        }
+        
+        function clearError() {
+            document.getElementById('errorArea').innerHTML = '';
+        }
+        
+        function showVisualizer() {
+            document.getElementById('visualizer').style.display = 'flex';
+        }
+        
+        function hideVisualizer() {
+            document.getElementById('visualizer').style.display = 'none';
+        }
+        
+        // Keep-alive ping
+        function sendPing() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({ type: 'ping' }));
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initWebSocket();
+            
+            // Send ping every 30 seconds to keep connection alive
+            setInterval(sendPing, 30000);
+            
+            // Add some helpful tips to chat
+            setTimeout(() => {
+                addMessage('bot', '💡 Tips: Click language buttons above, then use voice or text to ask about government schemes!');
+            }, 2000);
+            
+            setTimeout(() => {
+                addMessage('bot', '🎯 Try saying: "I am a farmer from Gujarat" or "मुझे किसान योजना चाहिए"');
+            }, 4000);
         });
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden, stop recording if active
+                if (isRecording) {
+                    stopVoiceChat();
+                }
+            }
+        });
+        
+        // Handle beforeunload
+        window.addEventListener('beforeunload', function() {
+            if (websocket) {
+                websocket.close();
+            }
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+            }
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Space bar to start/stop recording (when not in text input)
+            if (event.code === 'Space' && event.target !== document.getElementById('textInput')) {
+                event.preventDefault();
+                if (isRecording) {
+                    stopVoiceChat();
+                } else {
+                    startVoiceChat();
+                }
+            }
+            
+            // Escape to stop recording
+            if (event.code === 'Escape' && isRecording) {
+                stopVoiceChat();
+            }
+        });
+        
+        // Error handling for unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            showError('An unexpected error occurred. Please refresh the page.');
+        });
+        
+        // Additional utility functions
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function showConnectionQuality() {
+            if (websocket) {
+                const readyState = websocket.readyState;
+                const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+                updateStatus(`📡 Connection: ${states[readyState]}`, 'WebSocket status check');
+            }
+        }
+        
+        // Periodic connection quality check
+        setInterval(showConnectionQuality, 10000);
     </script>
 </body>
 </html>

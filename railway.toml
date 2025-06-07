@@ -1,9 +1,9 @@
 [build]
-builder = "nixpacks"
+builder = "NIXPACKS"
 
 [deploy]
 healthcheckPath = "/health"
 restartPolicyType = "ON_FAILURE"
 
-[variables]
-NIXPACKS_PYTHON_VERSION = "3.11"
+[environment]
+PORT = "8000"
