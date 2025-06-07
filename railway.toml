@@ -1,0 +1,10 @@
+# railway.toml
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
+
+[environment]
+PYTHONPATH = "/app"

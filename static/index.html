@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Government Schemes Assistant</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: 400;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        .chat-container {
+            flex: 1;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 600px;
+        }
+
+        .messages-area {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message {
+            display: flex;
+            gap: 15px;
+            max-width: 85%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .message.assistant .message-avatar {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+
+        .message-content {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e8eaed;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+        }
+
+        .input-area {
+            padding: 24px;
+            background: white;
+            border-top: 1px solid #e8eaed;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            background: #f8f9fa;
+            border-radius: 24px;
+            padding: 8px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .input-container:focus-within {
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+        }
+
+        .text-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            padding: 12px 16px;
+            font-size: 16px;
+            resize: none;
+            max-height: 120px;
+            min-height: 20px;
+            font-family: inherit;
+        }
+
+        .input-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            border: none;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            font-size: 1.1rem;
+        }
+
+        .voice-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .voice-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .voice-btn.recording {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            animation: pulse 2s infinite;
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .send-btn:disabled {
+            background: #e0e0e0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status-indicator {
+            padding: 12px 20px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            text-align: center;
+            font-size: 14px;
+            color: #667eea;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .status-indicator.listening {
+            background: rgba(255, 193, 7, 0.1);
+            color: #856404;
+            border-color: rgba(255, 193, 7, 0.3);
+        }
+
+        .status-indicator.processing {
+            background: rgba(108, 117, 125, 0.1);
+            color: #495057;
+            border-color: rgba(108, 117, 125, 0.3);
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .welcome-message h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .welcome-message p {
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: 16px 20px;
+            align-items: center;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        .language-selector {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .lang-btn.active,
+        .lang-btn:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .messages-area {
+                padding: 20px;
+            }
+            
+            .message {
+                max-width: 95%;
+            }
+        }
+
+        .scheme-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px 0;
+            border-left: 4px solid #667eea;
+        }
+
+        .scheme-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .scheme-details {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <i class="fas fa-robot"></i>
+                Government Schemes Assistant
+            </h1>
+            <p>Ask about government schemes in Hindi, English, or Hinglish</p>
+            <div class="language-selector">
+                <button class="lang-btn active" data-lang="english">English</button>
+                <button class="lang-btn" data-lang="hindi">हिंदी</button>
+                <button class="lang-btn" data-lang="hinglish">Hinglish</button>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div class="messages-area" id="messagesArea">
+                <div class="welcome-message">
+                    <h3>👋 Welcome to Government Schemes Assistant!</h3>
+                    <p>I can help you find relevant government schemes and benefits.</p>
+                    <p>Try asking:</p>
+                    <p>"What schemes are available for farmers?"</p>
+                    <p>"मुझे महिलाओं के लिए योजना चाहिए"</p>
+                    <p>"Kya business loan ki koi scheme hai?"</p>
+                </div>
+            </div>
+
+            <div class="status-indicator" id="statusIndicator">
+                Ready to help you find government schemes
+            </div>
+
+            <div class="input-area">
+                <div class="input-container">
+                    <textarea 
+                        id="textInput" 
+                        class="text-input" 
+                        placeholder="Ask about government schemes..."
+                        rows="1"
+                    ></textarea>
+                    <div class="input-buttons">
+                        <button id="voiceBtn" class="btn voice-btn" title="Voice input">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button id="sendBtn" class="btn send-btn" title="Send message">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class GovernmentSchemesChat {
+            constructor() {
+                this.socket = null;
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.currentLanguage = 'english';
+                this.isConnected = false;
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.connectWebSocket();
+            }
+
+            initializeElements() {
+                this.messagesArea = document.getElementById('messagesArea');
+                this.textInput = document.getElementById('textInput');
+                this.voiceBtn = document.getElementById('voiceBtn');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.statusIndicator = document.getElementById('statusIndicator');
+                this.langButtons = document.querySelectorAll('.lang-btn');
+            }
+
+            setupEventListeners() {
+                // Send button
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                
+                // Enter key to send
+                this.textInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                // Auto-resize textarea
+                this.textInput.addEventListener('input', () => {
+                    this.textInput.style.height = 'auto';
+                    this.textInput.style.height = (this.textInput.scrollHeight) + 'px';
+                });
+
+                // Voice button
+                this.voiceBtn.addEventListener('click', () => this.toggleVoiceInput());
+
+                // Language selection
+                this.langButtons.forEach(btn => {
+                    btn.addEventListener('click', () => this.selectLanguage(btn.dataset.lang));
+                });
+            }
+
+            connectWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws`;
+                
+                this.socket = new WebSocket(wsUrl);
+                
+                this.socket.onopen = () => {
+                    console.log('Connected to assistant');
+                    this.isConnected = true;
+                    this.updateStatus('Connected - Ready to help!', 'ready');
+                    this.clearWelcomeMessage();
+                };
+                
+                this.socket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'response') {
+                        this.addMessage(data.message, 'assistant');
+                        this.speakResponse(data.message);
+                        this.updateStatus('Ready for your next question', 'ready');
+                    }
+                };
+                
+                this.socket.onclose = () => {
+                    console.log('Disconnected from assistant');
+                    this.isConnected = false;
+                    this.updateStatus('Disconnected - Refresh to reconnect', 'error');
+                };
+
+                this.socket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    this.updateStatus('Connection error - Please refresh', 'error');
+                };
+            }
+
+            sendMessage() {
+                const message = this.textInput.value.trim();
+                if (!message || !this.isConnected) return;
+
+                this.addMessage(message, 'user');
+                this.textInput.value = '';
+                this.textInput.style.height = 'auto';
+                this.updateStatus('Processing your question...', 'processing');
+
+                this.socket.send(JSON.stringify({
+                    type: 'text',
+                    message: message,
+                    language: this.currentLanguage
+                }));
+            }
+
+            addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}`;
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'message-avatar';
+                avatar.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+                
+                const content = document.createElement('div');
+                content.className = 'message-content';
+                
+                if (sender === 'assistant' && text.includes('scheme')) {
+                    content.innerHTML = this.formatSchemeResponse(text);
+                } else {
+                    content.textContent = text;
+                }
+                
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(content);
+                
+                this.messagesArea.appendChild(messageDiv);
+                this.scrollToBottom();
+            }
+
+            formatSchemeResponse(text) {
+                // Simple formatting for scheme information
+                if (text.includes(':')) {
+                    return text.replace(/([^:]+):/g, '<div class="scheme-title">$1:</div><div class="scheme-details">') + '</div>';
+                }
+                return text;
+            }
+
+            async toggleVoiceInput() {
+                if (!this.isRecording) {
+                    await this.startVoiceInput();
+                } else {
+                    this.stopVoiceInput();
+                }
+            }
+
+            async startVoiceInput() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    
+                    let audioChunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        // For now, we'll show a message that voice is being processed
+                        this.addMessage('Voice message received', 'user');
+                        this.addMessage('Voice processing will be implemented soon. Please use text input for now.', 'assistant');
+                    };
+                    
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    
+                    this.voiceBtn.classList.add('recording');
+                    this.voiceBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                    this.updateStatus('Listening... Speak now!', 'listening');
+                    
+                } catch (error) {
+                    console.error('Microphone access denied:', error);
+                    alert('Please allow microphone access to use voice input.');
+                }
+            }
+
+            stopVoiceInput() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    
+                    this.voiceBtn.classList.remove('recording');
+                    this.voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    this.updateStatus('Processing voice input...', 'processing');
+                }
+            }
+
+            selectLanguage(lang) {
+                this.currentLanguage = lang;
+                this.langButtons.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.lang === lang);
+                });
+                
+                // Update placeholder text based on language
+                const placeholders = {
+                    english: 'Ask about government schemes...',
+                    hindi: 'सरकारी योजनाओं के बारे में पूछें...',
+                    hinglish: 'Government schemes ke baare mein puchiye...'
+                };
+                
+                this.textInput.placeholder = placeholders[lang] || placeholders.english;
+            }
+
+            updateStatus(message, type) {
+                this.statusIndicator.textContent = message;
+                this.statusIndicator.className = `status-indicator ${type}`;
+            }
+
+            speakResponse(text) {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.8;
+                    utterance.pitch = 1;
+                    
+                    // Set language based on current selection
+                    const langCodes = {
+                        english: 'en-US',
+                        hindi: 'hi-IN',
+                        hinglish: 'hi-IN'
+                    };
+                    
+                    utterance.lang = langCodes[this.currentLanguage] || 'en-US';
+                    speechSynthesis.speak(utterance);
+                }
+            }
+
+            clearWelcomeMessage() {
+                const welcomeMsg = this.messagesArea.querySelector('.welcome-message');
+                if (welcomeMsg) {
+                    welcomeMsg.style.display = 'none';
+                }
+            }
+
+            scrollToBottom() {
+                this.messagesArea.scrollTop = this.messagesArea.scrollHeight;
+            }
+        }
+
+        // Initialize the chat when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new GovernmentSchemesChat();
+        });
+    </script>
+</body>
+</html>
